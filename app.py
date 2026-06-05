@@ -925,10 +925,26 @@ def helpdesk_update_status(comp_id):
     return redirect(url_for('helpdesk_dashboard'))
 
 if __name__ == '__main__':
+    # Initialize database
     with app.app_context():
         db.create_all()
-        print("Database tables created successfully!")
+        print("Database created!")
+        
+        # Create admin user if not exists
+        if not User.query.filter_by(username='admin').first():
+            admin = User(
+                name='System Admin',
+                username='admin',
+                password='ICTadmin@123',
+                role='Admin',
+                is_approved=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            
     
+    # Create uploads folder
     if not os.path.exists(app.config['UPLOAD_FOLDER']):
         os.makedirs(app.config['UPLOAD_FOLDER'])
+    
     app.run(debug=True)
