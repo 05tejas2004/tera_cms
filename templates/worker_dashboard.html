@@ -1,0 +1,365 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-hard-hat"></i> Field Engineer Dashboard</h2>
+    </div>
+
+    <!-- Filter Status Alert -->
+    {% if request.args.get('status') %}
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>
+            <i class="fas fa-filter"></i> 
+            Showing: <strong>{{ request.args.get('status') }}</strong> complaints
+        </span>
+        <a href="{{ url_for('worker_dashboard') }}" class="btn btn-sm btn-outline-light">
+            <i class="fas fa-times"></i> Clear Filter
+        </a>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="row mt-3 mb-4">
+        <div class="col-md-3">
+            <a href="{{ url_for('worker_dashboard') }}" class="text-decoration-none">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ my_complaints|length }}</h3>
+                        <p>Total</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('worker_dashboard') }}?status=Pending" class="text-decoration-none">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        {% set pending_count = my_complaints|selectattr('status', 'equalto', 'Pending')|list|length %}
+                        <h3>{{ pending_count }}</h3>
+                        <p>Pending</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('worker_dashboard') }}?status=Active" class="text-decoration-none">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        {% set active_count = my_complaints|selectattr('status', 'equalto', 'Active')|list|length %}
+                        <h3>{{ active_count }}</h3>
+                        <p>Active</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('worker_dashboard') }}?status=Resolved" class="text-decoration-none">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        {% set resolved_count = my_complaints|selectattr('status', 'equalto', 'Resolved')|list|length %}
+                        <h3>{{ resolved_count }}</h3>
+                        <p>Awaiting Approval</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+
+        <!-- Action Buttons -->
+    <div class="row mt-4 mb-4">
+        <div class="col-md-12">
+            <a href="{{ url_for('worker_generate_report') }}" class="btn btn-outline-success w-100 py-3">
+                <i class="fas fa-file-pdf fa-2x"></i>
+                <h4 class="mt-2">Generate My Report</h4>
+                <small>Download PDF Report of Your Complaints</small>
+            </a>
+        </div>
+    </div>
+
+    <!-- Available Complaints -->
+    <div class="card mb-4">
+        <div class="card-header bg-primary d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-plus-circle"></i> Available Complaints</h5>
+            <span class="badge bg-warning text-dark">{{ pending_complaints|length }}</span>
+        </div>
+        <div class="card-body">
+            {% if pending_complaints %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Priority</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in pending_complaints %}
+                        <tr>
+                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td>{{ c.title }}</td>
+                            <td>
+                                {% if c.description %}
+                                    {% if c.description|length > 40 %}
+                                    <span title="{{ c.description }}">{{ c.description[:40] }}...</span>
+                                    {% else %}
+                                    {{ c.description }}
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-info text-dark">{{ c.category }}</span></td>
+                            <td>{{ c.location }}</td>
+                            <td>
+                                {% if c.priority == 'High' %}
+                                <span class="badge bg-danger">High</span>
+                                {% elif c.priority == 'Medium' %}
+                                <span class="badge bg-warning text-dark">Medium</span>
+                                {% else %}
+                                <span class="badge bg-info text-dark">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('accept_complaint', comp_id=c.id) }}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-check"></i> Accept
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-3">
+                <i class="fas fa-check-circle text-success" style="font-size: 2rem;"></i>
+                <p class="mt-2 text-muted">No new complaints available.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+        <!-- My Active Complaints -->
+    <div class="card mb-4">
+        <div class="card-header bg-success d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-tools"></i> My Active Complaints</h5>
+            <span class="badge bg-dark">{{ my_active|length }}</span>
+        </div>
+        <div class="card-body">
+            {% if my_active %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th style="width: 10%;">ID</th>
+                            <th style="width: 15%;">Title</th>
+                            <th style="width: 30%;">Description</th>
+                            <th style="width: 12%;">Category</th>
+                            <th style="width: 15%;">Location</th>
+                            <th style="width: 8%;">Priority</th>
+                            <th style="width: 10%;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in my_active %}
+                        <tr>
+                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td><strong>{{ c.title }}</strong></td>
+                            <td>
+                                {% if c.description %}
+                                <!-- Show more description text with scroll -->
+                                <div style="max-height: 80px; overflow-y: auto; white-space: normal; font-size: 0.85rem;">
+                                    {{ c.description }}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-secondary">{{ c.category }}</span></td>
+                            <td>
+                                <span title="{{ c.location }}">{{ c.location[:20] }}{% if c.location|length > 20 %}...{% endif %}</span>
+                            </td>
+                            <td>
+                                {% if c.priority == 'High' %}
+                                <span class="badge bg-danger">High</span>
+                                {% elif c.priority == 'Medium' %}
+                                <span class="badge bg-warning text-dark">Medium</span>
+                                {% else %}
+                                <span class="badge bg-info text-dark">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{{ url_for('resolve_complaint', comp_id=c.id) }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-wrench"></i> Resolve
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-3">
+                <i class="fas fa-tools text-muted" style="font-size: 2rem;"></i>
+                <p class="mt-2 text-muted">No active complaints.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    
+    <!-- Awaiting Approval -->
+    <div class="card mb-4">
+        <div class="card-header bg-secondary d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-clock"></i> Resolved - Awaiting Approval</h5>
+            <span class="badge bg-dark">{{ my_resolved|length }}</span>
+        </div>
+        <div class="card-body">
+            {% if my_resolved %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Location</th>
+                            <th>Resolved Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in my_resolved %}
+                        <tr>
+                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td>{{ c.title }}</td>
+                            <td>
+                                {% if c.description %}
+                                    {% if c.description|length > 40 %}
+                                    <span title="{{ c.description }}">{{ c.description[:40] }}...</span>
+                                    {% else %}
+                                    {{ c.description }}
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.location }}</td>
+                            <td>
+                                {% if c.resolved_at %}
+                                {{ c.resolved_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td><span class="badge bg-info">Waiting</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-3">
+                <i class="fas fa-clock text-muted" style="font-size: 2rem;"></i>
+                <p class="mt-2 text-muted">No resolved complaints waiting approval.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+        <div class="card-header bg-success d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-history"></i> History - Solved Complaints</h5>
+            <span class="badge bg-dark">{{ my_history|length }}</span>
+        </div>
+        <div class="card-body">
+            {% if my_history %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Description</th>
+                            <th>Location</th>
+                            <th>Resolved By</th>
+                            <th>Accepted Date</th>
+                            <th>Resolved Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in my_history %}
+                        <tr>
+                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td>{{ c.title }}</td>
+                            <td>
+                                {% if c.description %}
+                                    {% if c.description|length > 40 %}
+                                    <span title="{{ c.description }}">{{ c.description[:40] }}...</span>
+                                    {% else %}
+                                    {{ c.description }}
+                                    {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.location }}</td>
+                            <td>
+                                {% if c.assigned_to %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-user"></i> 
+                                    {% for eng in engineers %}
+                                        {% if eng.id == c.assigned_to %}
+                                            {{ eng.name }}
+                                        {% endif %}
+                                    {% endfor %}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.assigned_at %}
+                                {{ c.assigned_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.resolved_at %}
+                                {{ c.resolved_at.strftime('%Y-%m-%d %H:%M') }}
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.status == 'Closed' %}
+                                <span class="badge bg-success">Approved</span>
+                                {% elif c.status == 'Rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% else %}
+                                <span class="badge bg-warning text-dark">{{ c.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-3">
+                <i class="fas fa-history text-muted" style="font-size: 2rem;"></i>
+                <p class="mt-2 text-muted">No history yet. Complete complaints to see them here.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

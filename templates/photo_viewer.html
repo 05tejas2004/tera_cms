@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Photo Viewer - {{ complaint.complaint_id }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            background-color: #000;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .top-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.9), transparent);
+            padding: 15px 20px;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .photo-wrapper {
+            position: fixed;
+            top: 70px;
+            left: 60px;
+            right: 60px;
+            bottom: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .photo-wrapper img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            transition: transform 0.2s ease;
+            cursor: grab;
+        }
+        
+        .photo-nav {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 30px;
+            padding: 20px 15px;
+            cursor: pointer;
+            border: none;
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        
+        .photo-nav:hover {
+            background: rgba(255,255,255,0.3);
+            font-size: 35px;
+        }
+        
+        .photo-nav.prev { left: 10px; }
+        .photo-nav.next { right: 10px; }
+        
+        .bottom-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+            padding: 20px;
+            z-index: 1000;
+        }
+        
+        .thumbnail-track {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            overflow-x: auto;
+            padding: 10px;
+        }
+        
+        .thumbnail-track img {
+            height: 60px;
+            width: auto;
+            border: 2px solid transparent;
+            border-radius: 5px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: all 0.3s;
+        }
+        
+        .thumbnail-track img:hover,
+        .thumbnail-track img.active {
+            opacity: 1;
+            border-color: #0d6efd;
+            transform: scale(1.1);
+        }
+        
+        .zoom-indicator {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .photo-counter {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .info-box {
+            position: fixed;
+            bottom: 130px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 10px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div>
+            <a href="{{ url_for('operator_dashboard') }}" class="btn btn-outline-light btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Dashboard
+            </a>
+            <a href="{{ url_for('verify_complaint', comp_id=complaint.id) }}" class="btn btn-outline-warning btn-sm ms-2">
+                <i class="fas fa-clipboard-check"></i> Verify Page
+            </a>
+        </div>
+        <h5 class="text-white mb-0">
+            <i class="fas fa-camera"></i> {{ complaint.complaint_id }}
+        </h5>
+        <div>
+            {% if all_complaints %}
+            <div class="dropdown">
+                <button class="btn btn-outline-primary btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                    Other Photos
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                    {% for c in all_complaints[:10] %}
+                    <li><a class="dropdown-item" href="{{ url_for('photo_viewer', comp_id=c.id) }}">{{ c.complaint_id }}</a></li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if image_list %}
+    <!-- Photo Wrapper -->
+    <div class="photo-wrapper">
+        <img src="{{ url_for('static', filename='uploads/' + image_list[0]) }}" 
+             id="mainPhoto" 
+             onclick="toggleZoom()">
+        
+        {% if image_list|length > 1 %}
+        <button class="photo-nav prev" onclick="changePhoto(-1)">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <button class="photo-nav next" onclick="changePhoto(1)">
+            <i class="fas fa-chevron-right"></i>
+        </button>
+        {% endif %}
+    </div>
+
+    <!-- Zoom & Photo Counter -->
+    <div class="zoom-indicator">
+        <i class="fas fa-search-plus"></i> <span id="zoomLevel">100%</span>
+    </div>
+    
+    <div class="photo-counter">
+        <i class="fas fa-image"></i> <span id="photoCounter">1 / {{ image_list|length }}</span>
+    </div>
+
+    <div class="info-box">
+        <strong>{{ complaint.title }}</strong><br>
+        <span class="text-muted">{{ image_list[0] }}</span>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="bottom-bar">
+        <!-- Thumbnails -->
+        <div class="thumbnail-track">
+            {% for filename in image_list %}
+            <img src="{{ url_for('static', filename='uploads/' + filename) }}" 
+                 onclick="showPhoto({{ loop.index0 }})"
+                 class="{% if loop.first %}active{% endif %}"
+                 title="Photo {{ loop.index }}">
+            {% endfor %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="d-flex justify-content-center gap-3">
+            <button class="btn btn-outline-secondary" onclick="zoomOut()">
+                <i class="fas fa-minus"></i> Zoom Out
+            </button>
+            <button class="btn btn-outline-secondary" onclick="resetZoom()">
+                <i class="fas fa-compress-arrows-alt"></i> Reset
+            </button>
+            <button class="btn btn-outline-primary" onclick="zoomIn()">
+                <i class="fas fa-search-plus"></i> Zoom In
+            </button>
+            <button class="btn btn-outline-info" onclick="toggleFullscreen()">
+                <i class="fas fa-expand"></i> Fullscreen
+            </button>
+            <a href="{{ url_for('verify_complaint', comp_id=complaint.id) }}" class="btn btn-warning">
+                <i class="fas fa-clipboard-check"></i> Verify Complaint
+            </a>
+            <a href="{{ url_for('operator_dashboard') }}" class="btn btn-success">
+                <i class="fas fa-check"></i> Done
+            </a>
+        </div>
+    </div>
+
+    {% else %}
+    <!-- No Photos -->
+    <div class="d-flex align-items-center justify-content-center" style="height: 100vh;">
+        <div class="text-center">
+            <i class="fas fa-camera-slash text-muted" style="font-size: 5rem;"></i>
+            <h3 class="mt-3 text-white">No Photos Available</h3>
+            <p class="text-muted">This complaint has no uploaded photos.</p>
+            <a href="{{ url_for('verify_complaint', comp_id=complaint.id) }}" class="btn btn-warning mt-3">
+                <i class="fas fa-arrow-left"></i> Back to Verify Page
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
+    <script>
+        var imageList = {{ image_list|tojson }};
+        var currentIndex = 0;
+        var zoomLevel = 100;
+        
+        function showPhoto(index) {
+            currentIndex = index;
+            updatePhoto();
+        }
+        
+        function changePhoto(direction) {
+            currentIndex += direction;
+            if (currentIndex < 0) currentIndex = imageList.length - 1;
+            if (currentIndex >= imageList.length) currentIndex = 0;
+            updatePhoto();
+        }
+        
+        function updatePhoto() {
+            document.getElementById('mainPhoto').src = '/static/uploads/' + imageList[currentIndex];
+            resetZoom();
+            
+            // Update thumbnails
+            var thumbs = document.querySelectorAll('.thumbnail-track img');
+            thumbs.forEach(function(thumb, i) {
+                thumb.classList.toggle('active', i === currentIndex);
+            });
+            
+            // Update counter
+            document.getElementById('photoCounter').textContent = (currentIndex + 1) + ' / ' + imageList.length;
+        }
+        
+        function zoomIn() { zoomLevel += 25; applyZoom(); }
+        function zoomOut() { zoomLevel -= 25; applyZoom(); }
+        function resetZoom() { zoomLevel = 100; applyZoom(); }
+        
+        function applyZoom() {
+            if (zoomLevel < 25) zoomLevel = 25;
+            if (zoomLevel > 400) zoomLevel = 400;
+            document.getElementById('mainPhoto').style.transform = 'scale(' + (zoomLevel / 100) + ')';
+            document.getElementById('zoomLevel').textContent = zoomLevel + '%';
+        }
+        
+        function toggleZoom() {
+            resetZoom();
+            zoomLevel = 200;
+            applyZoom();
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'ArrowLeft') changePhoto(-1);
+            if (e.key === 'ArrowRight') changePhoto(1);
+            if (e.key === '+' || e.key === '=') zoomIn();
+            if (e.key === '-') zoomOut();
+            if (e.key === '0') resetZoom();
+            if (e.key === 'f') toggleFullscreen();
+        });
+    </script>
+</body>
+</html>

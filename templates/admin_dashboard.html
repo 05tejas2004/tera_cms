@@ -1,0 +1,313 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="fas fa-shield-alt"></i> Admin Dashboard</h2>
+    
+    <!-- Filter Status Alert -->
+    {% if request.args.get('status') %}
+    <div class="alert alert-info d-flex justify-content-between align-items-center mt-3">
+        <span>
+            <i class="fas fa-filter"></i> 
+            Showing: <strong>{{ request.args.get('status') }}</strong> complaints
+        </span>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-sm btn-outline-light">
+            <i class="fas fa-times"></i> Clear Filter
+        </a>
+    </div>
+    {% endif %}
+    
+    <!-- Clickable Stats Cards -->
+    <div class="row mt-4">
+        <div class="col-md-2">
+            <a href="{{ url_for('admin_dashboard') }}" class="text-decoration-none">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ total }}</h3>
+                        <p>Total</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('admin_dashboard') }}?status=Pending" class="text-decoration-none">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        <h3>{{ pending }}</h3>
+                        <p>Pending</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('admin_dashboard') }}?status=Active" class="text-decoration-none">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ active }}</h3>
+                        <p>Active</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('admin_dashboard') }}?status=Resolved" class="text-decoration-none">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ resolved }}</h3>
+                        <p>Resolved</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('admin_dashboard') }}?status=Closed" class="text-decoration-none">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ closed }}</h3>
+                        <p>Closed</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-2">
+            <a href="{{ url_for('admin_dashboard') }}?status=Rejected" class="text-decoration-none">
+                <div class="card bg-danger text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ reopened }}</h3>
+                        <p>Rejected</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <a href="{{ url_for('user_management') }}" class="btn btn-outline-light w-100 py-4">
+                <i class="fas fa-users fa-2x"></i>
+                <h4 class="mt-2">User Management</h4>
+                <small>View, Approve, Delete Users</small>
+            </a>
+        </div>
+        <div class="col-md-6">
+            <a href="{{ url_for('generate_report') }}" class="btn btn-outline-success w-100 py-4">
+                <i class="fas fa-file-pdf fa-2x"></i>
+                <h4 class="mt-2">Generate Report</h4>
+                <small>Download PDF Report</small>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Pending Users -->
+    <div class="card mt-4">
+        <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="fas fa-user-clock"></i> Pending User Approvals</h5>
+            <span class="badge bg-dark">{{ pending_users|length }}</span>
+        </div>
+        <div class="card-body">
+            {% if pending_users %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in pending_users %}
+                        <tr>
+                            <td>{{ user.name }}</td>
+                            <td>{{ user.username }}</td>
+                            <td><span class="badge bg-info">{{ user.role }}</span></td>
+                            <td>
+                                <a href="{{ url_for('approve_user', user_id=user.id) }}" class="btn btn-success btn-sm">
+                                    <i class="fas fa-check"></i> Approve
+                                </a>
+                                <a href="{{ url_for('reject_user', user_id=user.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Reject this user?')">
+                                    <i class="fas fa-times"></i> Reject
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="text-muted">No pending users.</p>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- All Complaints - WITH TIMESTAMPS & SEARCH FILTER -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list"></i> 
+                {% if request.args.get('status') %}
+                    {{ request.args.get('status') }} Complaints
+                {% else %}
+                    All Complaints
+                {% endif %}
+            </h5>
+            <span class="badge bg-dark">{{ filtered_complaints|length }}</span>
+        </div>
+        
+        <!-- Search Filter Bar (Corner) -->
+        <div class="card-body pb-0">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <span class="input-group-text bg-dark"><i class="fas fa-search"></i></span>
+                        <input type="text" id="adminSearch" class="form-control" placeholder="Search anything (ID, title, location, status, engineer)..." onkeyup="filterAdmin()">
+                    </div>
+                </div>
+                <div class="col-md-6 text-end">
+                    {% if request.args.get('status') %}
+                    <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-danger">
+                        <i class="fas fa-times"></i> Clear Status Filter
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover" id="adminTable">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Status</th>
+                            <th>Resolved By</th>
+                            <th>Created</th>
+                            <th>Accepted</th>
+                            <th>Resolved</th>
+                            <th>Time Taken</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in filtered_complaints %}
+                        <tr class="admin-row">
+                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td>{{ c.title }}</td>
+                            <td><span class="badge bg-secondary">{{ c.category }}</span></td>
+                            <td>{{ c.location }}</td>
+                            <td>
+                                {% if c.status == 'Pending' %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif c.status == 'Active' %}
+                                <span class="badge bg-primary">Active</span>
+                                
+                                {% elif c.status == 'Resolved' %}
+                                <span class="badge bg-success">Resolved</span>
+                                
+                                {% else %}
+                                <span class="badge bg-info">{{ c.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.assigned_to %}
+                                    {% for u in all_users %}
+                                        {% if u.id == c.assigned_to %}
+                                            <span class="badge bg-success">{{ u.name }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
+                            <td>
+                                {% if c.assigned_at %}
+                                <span class="badge bg-warning text-dark">{{ c.assigned_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.resolved_at %}
+                                <span class="badge bg-info">{{ c.resolved_at.strftime('%Y-%m-%d %H:%M') }}</span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.resolved_at %}
+                                    <span class="badge bg-secondary">{{ get_resolution_time(c.created_at, c.resolved_at) }}</span>
+                                {% else %}
+                                    {% if c.status == 'Active' %}
+                                    <span class="badge bg-primary"><i class="fas fa-spinner fa-spin"></i> In Progress</span>
+                                    {% else %}
+                                    <span class="text-muted">-</span>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <!-- Status Change Form -->
+                                <form method="POST" action="{{ url_for('admin_update_status', comp_id=c.id) }}" class="d-flex gap-1">
+                                    <select name="status" class="form-control form-control-sm bg-dark text-light" style="width: 100px;">
+                                        <option value="Pending" {% if c.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                        <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Active</option>
+                                        
+                                        <option value="Closed" {% if c.status == 'Closed' %}selected{% endif %}>Closed</option>
+                                        
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                
+                <!-- No Results Message -->
+                <div id="noAdminResults" class="text-center py-3" style="display: none;">
+                    <i class="fas fa-search text-muted" style="font-size: 2rem;"></i>
+                    <p class="mt-2 text-muted">No matching complaints found.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for Search Filter -->
+<script>
+function filterAdmin() {
+    var input = document.getElementById('adminSearch');
+    var filter = input.value.toLowerCase();
+    var table = document.getElementById('adminTable');
+    var rows = table.getElementsByTagName('tr');
+    var visibleCount = 0;
+    
+    // Loop through all table rows (skip header)
+    for (var i = 1; i < rows.length; i++) {
+        var row = rows[i];
+        var text = row.textContent || row.innerText;
+        
+        if (text.toLowerCase().indexOf(filter) > -1) {
+            row.style.display = "";
+            visibleCount++;
+        } else {
+            row.style.display = "none";
+        }
+    }
+    
+    // Show/hide "No results" message
+    var noResults = document.getElementById('noAdminResults');
+    if (visibleCount === 0) {
+        noResults.style.display = "block";
+    } else {
+        noResults.style.display = "none";
+    }
+}
+</script>
+{% endblock %}

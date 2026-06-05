@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-clipboard-check"></i> Verify Complaint</h2>
+        <a href="{{ url_for('operator_dashboard') }}" class="btn btn-outline-light">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+    
+    <!-- Complaint Details -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header bg-primary d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">{{ complaint.complaint_id }}</h4>
+                    <span class="badge bg-warning text-dark">{{ complaint.category }}</span>
+                </div>
+                <div class="card-body">
+                    <table class="table table-borderless text-light">
+                        <tr>
+                            <td><strong>Title:</strong></td>
+                            <td>{{ complaint.title }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Description:</strong></td>
+                            <td>{{ complaint.description }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Location:</strong></td>
+                            <td>{{ complaint.location }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Priority:</strong></td>
+                            <td>
+                                {% if complaint.priority == 'High' %}
+                                <span class="badge bg-danger">High</span>
+                                {% elif complaint.priority == 'Medium' %}
+                                <span class="badge bg-warning text-dark">Medium</span>
+                                {% else %}
+                                <span class="badge bg-info text-dark">Low</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if complaint.status == 'Resolved' %}
+                                <span class="badge bg-success">Resolved - Waiting Verification</span>
+                                {% else %}
+                                <span class="badge bg-info">{{ complaint.status }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Resolved By:</strong></td>
+                            <td>
+                                {% if assigned_user %}
+                                <span class="badge bg-success">
+                                    <i class="fas fa-user"></i> {{ assigned_user.name }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Resolved Date:</strong></td>
+                            <td>{{ complaint.resolved_at.strftime('%Y-%m-%d %H:%M') if complaint.resolved_at else '-' }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Resolution Details -->
+            <div class="card mt-3">
+                <div class="card-header bg-success">
+                    <h5 class="mb-0"><i class="fas fa-check-circle"></i> Resolution Details</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Resolution Remarks:</strong></p>
+                    <p class="alert alert-dark">{{ complaint.resolution_remarks }}</p>
+                    
+                    <p><strong>GPS Location:</strong></p>
+                    <p class="alert alert-dark">{{ complaint.worker_location }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Action Panel -->
+        <div class="col-md-4">
+            <!-- Photos Section -->
+            <div class="card mb-3">
+                <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-camera"></i> Photos</h5>
+                    <span class="badge bg-dark">{{ images|length }}</span>
+                </div>
+                <div class="card-body">
+                    {% if images %}
+                    <div class="row">
+                        {% for img in images %}
+                        <div class="col-12 mb-3">
+                            <!-- Photo Thumbnail -->
+                            <img src="{{ url_for('static', filename='uploads/' + img.filename) }}" 
+                                 class="img-thumbnail" 
+                                 style="width: 100%; height: 200px; object-fit: cover;">
+                            
+                            
+                            <!-- Full Size Modal -->
+                            <div class="modal fade" id="viewPhotoModal{{ img.id }}" tabindex="-1" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-md-down">
+                                    <div class="modal-content bg-dark">
+                                        <div class="modal-header bg-primary text-white">
+                                            <h5 class="modal-title">
+                                                <i class="fas fa-image"></i> Photo {{ loop.index }} - {{ complaint.complaint_id }}
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body d-flex align-items-center justify-content-center p-4" 
+                                             style="min-height: 60vh; background: #000;">
+                                            <img src="{{ url_for('static', filename='uploads/' + img.filename) }}" 
+                                                 class="img-fluid" 
+                                                 style="max-height: 70vh; max-width: 100%;">
+                                        </div>
+                                        <div class="modal-footer bg-dark">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                            <a href="{{ url_for('photo_viewer', comp_id=complaint.id) }}" class="btn btn-info">
+                                                <i class="fas fa-expand-arrows-alt"></i> Open Photo Viewer
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-camera-slash text-muted" style="font-size: 3rem;"></i>
+                        <p class="text-muted mt-2">No photos uploaded</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Open Photo Viewer Button -->
+            {% if images %}
+            <div class="card mb-3 bg-dark">
+                <div class="card-body">
+                    <a href="{{ url_for('photo_viewer', comp_id=complaint.id) }}" class="btn btn-dark w-100 border">
+                        <i class="fas fa-expand-arrows-alt"></i> Open Photo Viewer (Zoom Available)
+                    </a>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Verify & Close Button -->
+            <div class="card mb-3">
+                <div class="card-header bg-success">
+                    <h5 class="mb-0"><i class="fas fa-check"></i> Verify & Close</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Approve this complaint and mark it as closed.</p>
+                    <form method="POST" action="{{ url_for('approve_close', comp_id=complaint.id) }}">
+                        <button type="submit" class="btn btn-success w-100 py-2" 
+                                onclick="return confirm('Are you sure you want to verify and close this complaint?')">
+                            <i class="fas fa-check-circle"></i> Verify & Close
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Reject Button -->
+            <div class="card border-danger">
+                <div class="card-header bg-danger">
+                    <h5 class="mb-0"><i class="fas fa-times"></i> Reject Resolution</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">Send back to field engineer for rework.</p>
+                    <button type="button" class="btn btn-danger w-100 py-2" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                        <i class="fas fa-times-circle"></i> Reject
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Reject Modal -->
+            <div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content bg-dark">
+                        <div class="modal-header">
+                            <h5 class="modal-title">Reject: {{ complaint.complaint_id }}</h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <form method="POST" action="{{ url_for('reject_close', comp_id=complaint.id) }}">
+                            <div class="modal-body">
+                                <label class="form-label">Reason for rejection:</label>
+                                <textarea name="reason" class="form-control" rows="4" placeholder="Explain what needs to be fixed..." required></textarea>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="submit" class="btn btn-danger">
+                                    <i class="fas fa-times"></i> Reject & Send Back
+                                </button>
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

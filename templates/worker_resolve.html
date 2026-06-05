@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block content %}
+<h2><i class="fas fa-check-circle"></i> Resolve Complaint</h2>
+
+<div class="card mb-4">
+    <div class="card-header bg-primary">
+        <h5 class="mb-0">{{ complaint.complaint_id }} - {{ complaint.title }}</h5>
+    </div>
+    <div class="card-body">
+        <p><strong>Location:</strong> {{ complaint.location }}</p>
+        <p><strong>Description:</strong> {{ complaint.description }}</p>
+    </div>
+</div>
+
+<div class="card bg-dark">
+    <div class="card-body">
+        <form method="POST" enctype="multipart/form-data">
+            <div class="mb-3">
+                <label class="form-label">GPS Location</label>
+                <div class="input-group">
+                    <input type="text" name="gps_loc" id="gps" class="form-control" placeholder="Click button to capture location" readonly>
+                    <button type="button" class="btn btn-outline-info" onclick="getLocation()">
+                        <i class="fas fa-map-marker-alt"></i> Get Location
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Upload Photo</label>
+                <!-- Camera option - opens camera directly on mobile -->
+                <input type="file" name="image" id="photo" class="form-control" accept="image/*" capture="environment" onchange="previewImage(event)">
+                
+                <!-- Alternative buttons for camera (desktop) or gallery (mobile) -->
+                <div class="mt-2">
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="openCamera()">
+                        <i class="fas fa-camera"></i> Open Camera
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('photo').click()">
+                        <i class="fas fa-folder-open"></i> Choose from Gallery
+                    </button>
+                </div>
+                
+                <!-- Image Preview -->
+                <div id="preview-container" class="mt-3" style="display: none;">
+                    <img id="preview-img" class="img-thumbnail" style="max-width: 300px; max-height: 300px;">
+                </div>
+            </div>
+            
+            <div class="mb-3">
+                <label class="form-label">Work Remarks</label>
+                <textarea name="remarks" class="form-control" rows="4" placeholder="Describe work done..." required></textarea>
+            </div>
+            
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="fas fa-paper-plane"></i> Submit Resolution
+            </button>
+            <a href="{{ url_for('worker_dashboard') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </form>
+    </div>
+</div>
+
+<script>
+// Get GPS Location
+function getLocation() {
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(function(position) {
+            document.getElementById('gps').value = position.coords.latitude + ", " + position.coords.longitude;
+        });
+    } else {
+        alert("GPS not supported in this browser!");
+    }
+}
+
+// Open camera directly
+function openCamera() {
+    var input = document.getElementById('photo');
+    // capture="environment" uses rear camera on mobile
+    input.setAttribute('capture', 'environment');
+    input.click();
+}
+
+// Preview uploaded image
+function previewImage(event) {
+    var reader = new FileReader();
+    reader.onload = function() {
+        var output = document.getElementById('preview-img');
+        output.src = reader.result;
+        document.getElementById('preview-container').style.display = 'block';
+    };
+    reader.readAsDataURL(event.target.files[0]);
+}
+
+// Request camera permission and show on mobile
+function openCameraMobile() {
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        // Front or back camera
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+            .then(function(stream) {
+                // Just trigger file input with camera
+                document.getElementById('photo').click();
+            })
+            .catch(function(err) {
+                console.log("Camera error: ", err);
+                // Fallback to file input
+                document.getElementById('photo').click();
+            });
+    } else {
+        document.getElementById('photo').click();
+    }
+}
+</script>
+{% endblock %}

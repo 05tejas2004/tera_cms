@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <h2><i class="fas fa-headset"></i> Help Desk Dashboard</h2>
+    
+    <!-- Filter Status -->
+    {% if request.args.get('status') %}
+    <div class="alert alert-info d-flex justify-content-between align-items-center mt-3">
+        <span>
+            <i class="fas fa-filter"></i> 
+            Showing: <strong>{{ request.args.get('status') }}</strong> complaints
+        </span>
+        <a href="{{ url_for('helpdesk_dashboard') }}" class="btn btn-sm btn-outline-light">
+            <i class="fas fa-times"></i> Clear Filter
+        </a>
+    </div>
+    {% endif %}
+    
+    <!-- Clickable Stats Cards -->
+    <div class="row mt-4">
+        <div class="col-md-3">
+            <a href="{{ url_for('helpdesk_dashboard') }}" class="text-decoration-none">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h3>{{ complaints|length }}</h3>
+                        <p>Total</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('helpdesk_dashboard') }}?status=Pending" class="text-decoration-none">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body text-center">
+                        {% set pending_count = complaints|selectattr('status', 'equalto', 'Pending')|list|length %}
+                        <h3>{{ pending_count }}</h3>
+                        <p>Pending</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('helpdesk_dashboard') }}?status=Resolved" class="text-decoration-none">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        {% set resolved_count = complaints|selectattr('status', 'equalto', 'Resolved')|list|length %}
+                        <h3>{{ resolved_count }}</h3>
+                        <p>Resolved</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('helpdesk_dashboard') }}?status=Closed" class="text-decoration-none">
+                <div class="card bg-secondary text-white">
+                    <div class="card-body text-center">
+                        {% set closed_count = complaints|selectattr('status', 'equalto', 'Closed')|list|length %}
+                        <h3>{{ closed_count }}</h3>
+                        <p>Closed</p>
+                    </div>
+                </div>
+            </a>
+        </div>
+    </div>
+    
+    <!-- Register New Complaint Button -->
+    <div class="mt-4">
+        <a href="{{ url_for('register_complaint') }}" class="btn btn-success">
+            <i class="fas fa-plus"></i> Register New Complaint
+        </a>
+    </div>
+    
+    <!-- All Complaints - WITH STATUS CHANGE -->
+    <div class="card mt-4">
+        <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">
+                <i class="fas fa-list"></i> 
+                {% if request.args.get('status') %}
+                    {{ request.args.get('status') }} Complaints
+                {% else %}
+                    All Complaints
+                {% endif %}
+            </h5>
+            <span class="badge bg-dark">{{ complaints|length }}</span>
+        </div>
+        <div class="card-body">
+            {% if filtered_complaints %}
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead class="table-secondary">
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Category</th>
+                            <th>Location</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Resolved By</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in filtered_complaints %}
+                        <tr>
+                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td>{{ c.title }}</td>
+                            <td><span class="badge bg-secondary">{{ c.category }}</span></td>
+                            <td>{{ c.location }}</td>
+                            <td>
+                                {% if c.priority == 'High' %}
+                                <span class="badge bg-danger">High</span>
+                                {% elif c.priority == 'Medium' %}
+                                <span class="badge bg-warning text-dark">Medium</span>
+                                {% else %}
+                                <span class="badge bg-info text-dark">Low</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.status == 'Pending' %}
+                                <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif c.status == 'Active' %}
+                                <span class="badge bg-primary">Active</span>
+                                {% elif c.status == 'Resolved' %}
+                                <span class="badge bg-success">Resolved</span>
+                                {% elif c.status == 'Closed' %}
+                                <span class="badge bg-secondary">Closed</span>
+                                {% elif c.status == 'Rejected' %}
+                                <span class="badge bg-danger">Rejected</span>
+                                {% else %}
+                                <span class="badge bg-info">{{ c.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if c.assigned_to %}
+                                    {% for eng in engineers %}
+                                        {% if eng.id == c.assigned_to %}
+                                            <span class="badge bg-success">{{ eng.name }}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
+                            <td>
+                                <!-- Status Change Form -->
+                                <form method="POST" action="{{ url_for('helpdesk_update_status', comp_id=c.id) }}" class="d-flex gap-1">
+                                    <select name="status" class="form-control form-control-sm bg-dark text-light" style="width: 100px;">
+                                        <option value="Pending" {% if c.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                        <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Active</option>
+                                        <option value="Closed" {% if c.status == 'Closed' %}selected{% endif %}>Closed (PS)</option>
+                                    </select>
+                                    <button type="submit" class="btn btn-sm btn-primary">
+                                        <i class="fas fa-check"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% elif not filtered_complaints and request.args.get('status') %}
+            <div class="text-center py-4">
+                <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                <p class="mt-2">No {{ request.args.get('status') }} complaints found.</p>
+            </div>
+            {% else %}
+            <div class="text-center py-4">
+                <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                <p class="mt-2">No complaints registered yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
