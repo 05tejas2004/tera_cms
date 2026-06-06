@@ -7,7 +7,7 @@
                 <h4><i class="fas fa-sign-in-alt"></i> Login</h4>
             </div>
             <div class="card-body">
-                <form method="POST">
+                <form id="loginForm">
                     <div class="mb-3">
                         <label class="form-label">Username</label>
                         <div class="input-group">
@@ -39,7 +39,7 @@
                         </div>
                     </div>
                     
-                    <!-- ✅ Added: Remember Me Checkbox -->
+                    <!-- ✅ Remember Me Checkbox -->
                     <div class="mb-3 form-check">
                         <input type="checkbox" class="form-check-input" id="remember_me" name="remember_me">
                         <label class="form-check-label" for="remember_me">
@@ -67,6 +67,7 @@
     </div>
 </div>
 
+<!-- ✅ JavaScript for Auto Login + Form Handling -->
 <script>
 function togglePassword() {
     var passwordInput = document.getElementById('passwordField');
@@ -80,36 +81,72 @@ function togglePassword() {
         eyeIcon.className = 'fas fa-eye';
     }
 }
+
+// Auto login on page load using device token
+document.addEventListener('DOMContentLoaded', function() {
+    const storedToken = localStorage.getItem('device_token');
+    
+    if (storedToken) {
+        fetch('/auto_login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({device_token: storedToken})
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                window.location.href = '/dashboard';
+            } else {
+                localStorage.removeItem('device_token');
+            }
+        })
+        .catch(() => localStorage.removeItem('device_token'));
+    }
+});
+
+// Handle form submission
+document.getElementById('loginForm').addEventListener('submit', function(event) {
+    event.preventDefault();
+    
+    const formData = new FormData(this);
+    const username = formData.get('username');
+    const password = formData.get('password');
+    const rememberMe = document.getElementById('remember_me').checked;
+    
+    fetch('/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: username, password: password, remember_me: rememberMe})
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Save device token if remember me is checked
+            if (rememberMe && data.device_token) {
+                localStorage.setItem('device_token', data.device_token);
+            }
+            window.location.href = '/dashboard';
+        } else {
+            alert(data.message || 'Login failed');
+        }
+    })
+    .catch(err => {
+        alert('Login error: ' + err);
+    });
+});
 </script>
 
 <style>
 @media (max-width: 768px) {
-    .col-md-5 {
-        margin: 10px;
-    }
-    
-    .card-body {
-        padding: 20px 15px !important;
-    }
-    
-    .input-group-text {
-        min-width: 45px;
-    }
-    
-    .btn-lg {
-        padding: 12px;
-        font-size: 15px;
-    }
+    .col-md-5 { margin: 10px; }
+    .card-body { padding: 20px 15px !important; }
+    .input-group-text { min-width: 45px; }
+    .btn-lg { padding: 12px; font-size: 15px; }
 }
 
 @media (hover: none) and (pointer: coarse) {
-    .input-group-text {
-        min-width: 50px;
-    }
-    
-    button[onclick="togglePassword()"] {
-        padding: 10px;
-    }
+    .input-group-text { min-width: 50px; }
+    button[onclick="togglePassword()"] { padding: 10px; }
 }
 </style>
 {% endblock %}
