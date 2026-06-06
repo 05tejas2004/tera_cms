@@ -8,6 +8,8 @@ import os
 from sqlalchemy import func
 import pandas as pd
 from werkzeug.utils import secure_filename
+from flask_login import login_user
+from datetime import timedelta
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tera-secret-key'
@@ -106,7 +108,18 @@ def login():
             if not user.is_approved:
                 flash('Account pending approval by Admin.')
                 return redirect(url_for('login'))
-            login_user(user)
+            
+            # Check if "Remember Me" is checked
+            remember_me = request.form.get('remember_me', False)
+            
+            # login_user with remember option
+            login_user(user, remember=remember_me)
+            
+            # Optional: Make session permanent (30 days)
+            # if remember_me:
+            #     session.permanent = True
+            #     login_manager.session_protection = 'strong'
+            
             return redirect(url_for('dashboard'))
         flash('Invalid credentials')
     return render_template('login.html')
