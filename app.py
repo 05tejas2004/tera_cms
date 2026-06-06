@@ -10,6 +10,9 @@ import pandas as pd
 from werkzeug.utils import secure_filename
 from flask_login import login_user
 from datetime import timedelta
+import uuid
+import json
+from flask import jsonify
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tera-secret-key'
@@ -21,6 +24,15 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
+# Add this temporarily to your app.py and run once
+with app.app_context():
+    try:
+        db.session.execute(db.text('ALTER TABLE user ADD COLUMN device_token VARCHAR(100)'))
+        db.session.commit()
+        print("Column added successfully!")
+    except:
+        print("Column already exists or error!")
+
 # --- Models ---
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,6 +41,7 @@ class User(UserMixin, db.Model):
     password = db.Column(db.String(100))
     role = db.Column(db.String(20))
     is_approved = db.Column(db.Boolean, default=False)
+    device_token = db.Column(db.String(100), nullable=True)  # ✅ Add this
 
 class Complaint(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -109,20 +122,40 @@ def login():
                 flash('Account pending approval by Admin.')
                 return redirect(url_for('login'))
             
-            # Check if "Remember Me" is checked
             remember_me = request.form.get('remember_me', False)
-            
-            # login_user with remember option
             login_user(user, remember=remember_me)
             
-            # Optional: Make session permanent (30 days)
-            # if remember_me:
-            #     session.permanent = True
-            #     login_manager.session_protection = 'strong'
+            # ✅ If remember me, generate device token
+            if remember_me:
+                if not user.device_token:
+                    user.device_token = str(uuid.uuid4())
+                    db.session.commit()
+                
+                # Return token to save in localStorage
+                return jsonify({
+                    'success': True,
+                    'device_token': user.device_token,
+                    'role': user.role
+                })
             
-            return redirect(url_for('dashboard'))
-        flash('Invalid credentials')
+            return jsonify({'success': True, 'role': user.role})
+        return jsonify({'success': False, 'message': 'Invalid credentials'}), 401
+    
     return render_template('login.html')
+
+@app.route('/auto_login', methods=['POST'])
+def auto_login():
+    """Auto login using device token"""
+    data = request.get_json()
+    device_token = data.get('device_token')
+    
+    if device_token:
+        user = User.query.filter_by(device_token=device_token, is_approved=True).first()
+        if user:
+            login_user(user, remember=True)
+            return jsonify({'success': True, 'role': user.role})
+    
+    return jsonify({'success': False}), 401
 
 @app.route('/dashboard')
 @login_required
@@ -1239,6 +1272,14 @@ def helpdesk_close(comp_id):
 if __name__ == '__main__':
     # Initialize database
     with app.app_context():
+        # ✅ Add missing column to existing database
+        try:
+            db.session.execute(db.text('ALTER TABLE user ADD COLUMN device_token VARCHAR(100)'))
+            db.session.commit()
+            print("Column added successfully!")
+        except Exception as e:
+            print(f"Column already exists or error: {e}")
+        
         db.create_all()
         print("Database created!")
 
@@ -1252,9 +1293,6 @@ if __name__ == '__main__':
             )
             db.session.add(admin)
             db.session.commit()
-
-    if not os.path.exists(app.config['UPLOAD_FOLDER']):
-        os.makedirs(app.config['UPLOAD_FOLDER'])
 
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
