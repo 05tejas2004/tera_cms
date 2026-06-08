@@ -25,13 +25,7 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 
 # Add this temporarily to your app.py and run once
-with app.app_context():
-    try:
-        db.session.execute(db.text('ALTER TABLE user ADD COLUMN device_token VARCHAR(100)'))
-        db.session.commit()
-        print("Column added successfully!")
-    except:
-        print("Column already exists or error!")
+
 
 # --- Models ---
 class User(UserMixin, db.Model):
