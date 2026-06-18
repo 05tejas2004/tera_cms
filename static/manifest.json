@@ -1,24 +1,65 @@
 {
-  "short_name": "TeraCMS",
+  "id": "/",
   "name": "Tera Complaint Management System",
-  "description": "Real-time Complaint Management System with instant notifications and offline synchronization.",
+  "short_name": "TeraCMS",
+  "description": "Complaint Management System for Smart City Operations",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "window-controls-overlay",
+    "standalone"
+  ],
+  "background_color": "#1b365d",
+  "theme_color": "#343a40",
+  "orientation": "portrait",
+  "categories": [
+    "business",
+    "productivity",
+    "government"
+  ],
   "icons": [
     {
-      "src": "/static/tera_logo.png",
-      "type": "image/png",
+      "src": "/static/icons/icon-192.png",
       "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/static/tera_logo.png",
-      "type": "image/png",
+      "src": "/static/icons/icon-512.png",
       "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ],
-  "start_url": "/dashboard",
-  "background_color": "#1b365d",
-  "theme_color": "#343a40",
-  "display": "standalone",
-  "orientation": "portrait"
+  "screenshots": [
+    {
+      "src": "/static/screenshots/login.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/static/screenshots/dashboard.png",
+      "sizes": "1920x1080",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "url": "/dashboard"
+    },
+    {
+      "name": "New Complaint",
+      "url": "/create_complaint"
+    },
+    {
+      "name": "Reports",
+      "url": "/reports"
+    }
+  ]
 }

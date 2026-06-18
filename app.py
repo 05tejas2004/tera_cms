@@ -14,7 +14,7 @@ from datetime import timedelta
 import uuid
 import json
 from flask import jsonify
-
+from flask import send_from_directory
 
 from flask import request, make_response, redirect, url_for
 from datetime import datetime
@@ -705,6 +705,14 @@ def generate_report():
 # ============================================
 # THEN, ADD THE ROUTE AFTER ALL OTHER ROUTES
 # ============================================
+
+@app.route("/offline")
+def offline():
+    return render_template("offline.html")
+
+@app.route("/sw.js")
+def service_worker():
+    return send_from_directory("static", "sw.js")
 
 @app.route('/admin/upload_users', methods=['GET', 'POST'])
 @login_required

@@ -11,7 +11,8 @@
     <meta name="description" content="TERA CMS - Complaint Management System">
 
     <title>Tera Software Power Complaint Registration System</title>
-    
+    <link rel="apple-touch-icon"
+      href="{{ url_for('static', filename='icons/icon-192.png') }}">
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='Tera_Logo.png') }}">
     
@@ -430,6 +431,11 @@
             });
         }
     </script>
+    <script>
+    if ("Notification" in window) {
+        Notification.requestPermission();
+    }
+</script>
 
     <script>
         let deferredPrompt;
