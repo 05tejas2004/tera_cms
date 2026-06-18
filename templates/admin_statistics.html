@@ -1,169 +1,305 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-4">
-    <h2><i class="fas fa-chart-bar"></i> Statistics Dashboard</h2>
+<style>
+    /* Premium Dark Theme Analytics Styling */
+    .glass-card {
+        background: rgba(33, 37, 41, 0.75);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+    .glass-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    }
+    .metric-gradient-blue { border-left: 5px solid #0dcaf0; }
+    .metric-gradient-success { border-left: 5px solid #198754; }
+    .metric-gradient-warning { border-left: 5px solid #ffc107; }
+    .metric-gradient-primary { border-left: 5px solid #0d6efd; }
     
-    <!-- Back to Dashboard -->
-    <div class="mb-3">
-        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light">
-            <i class="fas fa-arrow-left"></i> Back to Dashboard
+    .filter-btn {
+        border-radius: 20px;
+        padding: 6px 20px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+    .chart-container-wrapper {
+        position: relative;
+        width: 100%;
+        height: 300px;
+    }
+    .staff-row-item {
+        transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+</style>
+
+<div class="container mt-4">
+    <!-- Top Dashboard Navbar Actions -->
+    <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom border-secondary">
+        <h2><i class="fas fa-chart-line text-info"></i> Interactive Analytics Hub</h2>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light btn-sm px-3">
+            <i class="fas fa-arrow-left me-2"></i>Exit Hub
         </a>
     </div>
     
-    <!-- ==================== USER STATISTICS ==================== -->
-    <div class="row mt-4">
+    <!-- ==================== LIVE CONTROL INTERACTION FILTER ==================== -->
+    <div class="card glass-card mb-4 border-0 shadow">
+        <div class="card-body p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center">
+                <span class="text-muted me-3"><i class="fas fa-filter text-warning"></i> Quick Filter:</span>
+                <div class="btn-group shadow-sm" role="group" aria-label="Staff Category Filters">
+                    <button type="button" class="btn btn-primary filter-btn px-4" onclick="applyStaffFilter('all', this)"><i class="fas fa-th-large me-1"></i> All Staff</button>
+                    <button type="button" class="btn btn-outline-light filter-btn" onclick="applyStaffFilter('engineer', this)"><i class="fas fa-helmet-safety me-1"></i> Engineers</button>
+                    <button type="button" class="btn btn-outline-light filter-btn" onclick="applyStaffFilter('tech', this)"><i class="fas fa-desktop me-1"></i> Tech Support</button>
+                    <button type="button" class="btn btn-outline-light filter-btn" onclick="applyStaffFilter('helpdesk', this)"><i class="fas fa-headset me-1"></i> HelpDesk</button>
+                </div>
+            </div>
+            <div id="filterStatus" class="badge bg-dark border border-secondary py-2 px-3 text-info">
+                Showing all active support members
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== USER SYSTEM OVERVIEW METRICS ==================== -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card glass-card text-white h-100 border-0 shadow-sm metric-gradient-blue">
+                <div class="card-body py-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="display-6 fw-bold mb-1">{{ total_users }}</h2>
+                            <p class="text-muted small mb-0 uppercase tracking-wider">Total Ecosystem Users</p>
+                        </div>
+                        <i class="fas fa-users fa-2x text-info opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card glass-card text-white h-100 border-0 shadow-sm metric-gradient-success">
+                <div class="card-body py-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="display-6 fw-bold mb-1 text-success">{{ approved_users }}</h2>
+                            <p class="text-muted small mb-0 uppercase tracking-wider">Active Approved</p>
+                        </div>
+                        <i class="fas fa-check-circle fa-2x text-success opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card glass-card text-white h-100 border-0 shadow-sm metric-gradient-warning">
+                <div class="card-body py-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="display-6 fw-bold mb-1 text-warning">{{ pending_users }}</h2>
+                            <p class="text-muted small mb-0 uppercase tracking-wider">Awaiting Verification</p>
+                        </div>
+                        <i class="fas fa-clock fa-2x text-warning opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card glass-card text-white h-100 border-0 shadow-sm metric-gradient-primary">
+                <div class="card-body py-4">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="display-6 fw-bold mb-1 text-primary">{{ engineers }}</h2>
+                            <p class="text-muted small mb-0 uppercase tracking-wider">Field Operatives</p>
+                        </div>
+                        <i class="fas fa-hard-hat fa-2x text-primary opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- SYSTEM CORE ANALYTICS GRAPH COMPONENT -->
+    <div class="row g-4 mb-4">
+        <div class="col-md-6">
+            <div class="card glass-card text-white border-0 shadow h-100">
+                <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                    <h5 class="mb-0"><i class="fas fa-chart-pie text-info me-2"></i>User Base Demographics</h5>
+                </div>
+                <div class="card-body p-4 d-flex align-items-center justify-content-center">
+                    <div class="chart-container-wrapper"><canvas id="userRoleChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card glass-card text-white border-0 shadow h-100">
+                <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                    <h5 class="mb-0"><i class="fas fa-shapes text-success me-2"></i>Registration Pipeline</h5>
+                </div>
+                <div class="card-body p-4 d-flex align-items-center justify-content-center">
+                    <div class="chart-container-wrapper"><canvas id="userStatusChart"></canvas></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- ==================== TICKET & COMPLAINT PIPELINE ==================== -->
+    <div class="row mt-5 mb-3">
         <div class="col-12">
-            <h4 class="text-info"><i class="fas fa-users"></i> User Statistics</h4>
+            <h4 class="text-light"><i class="fas fa-exchange-alt text-primary me-2"></i>Operational Pipeline Statistics</h4>
         </div>
     </div>
     
-    <div class="row mt-2">
-        <div class="col-md-3">
-            <div class="card bg-info text-white">
-                <div class="card-body text-center">
-                    <h3>{{ total_users }}</h3>
-                    <p>Total Users</p>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card glass-card text-white text-center py-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <h3 class="fw-bold text-primary mb-1">{{ total_complaints }}</h3>
+                    <p class="text-muted small mb-0">Aggregate System Cases Raised</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-success text-white">
-                <div class="card-body text-center">
-                    <h3>{{ approved_users }}</h3>
-                    <p>Approved</p>
+        <div class="col-md-4">
+            <div class="card glass-card text-white text-center py-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <h3 class="fw-bold text-warning mb-1">{{ pending }}</h3>
+                    <p class="text-muted small mb-0">Unassigned / Pending Triaging</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-warning text-dark">
-                <div class="card-body text-center">
-                    <h3>{{ pending_users }}</h3>
-                    <p>Pending</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="card bg-primary text-white">
-                <div class="card-body text-center">
-                    <h3>{{ engineers }}</h3>
-                    <p>Engineers</p>
+        <div class="col-md-4">
+            <div class="card glass-card text-white text-center py-3 border-0 shadow-sm">
+                <div class="card-body">
+                    <h3 class="fw-bold text-success mb-1">{{ active }}</h3>
+                    <p class="text-muted small mb-0">Live Active In-Progress Cases</p>
                 </div>
             </div>
         </div>
     </div>
     
-    <!-- User Charts -->
-    <div class="row mt-4">
+    <!-- VISUAL TICKET MAPS -->
+    <div class="row g-4 mb-4">
         <div class="col-md-6">
-            <div class="card bg-dark">
-                <div class="card-header"><h5><i class="fas fa-chart-pie"></i> User Role Distribution</h5></div>
-                <div class="card-body"><canvas id="userRoleChart"></canvas></div>
+            <div class="card glass-card text-white border-0 shadow">
+                <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                    <h5><i class="fas fa-spinner text-warning me-2"></i>Lifecycle Settlement Ratio</h5>
+                </div>
+                <div class="card-body p-4"><div class="chart-container-wrapper"><canvas id="complaintStatusChart"></canvas></div></div>
             </div>
         </div>
         <div class="col-md-6">
-            <div class="card bg-dark">
-                <div class="card-header"><h5><i class="fas fa-chart-bar"></i> User Status</h5></div>
-                <div class="card-body"><canvas id="userStatusChart"></canvas></div>
+            <div class="card glass-card text-white border-0 shadow">
+                <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                    <h5><i class="fas fa-fire text-danger me-2"></i>Priority Metrics Breakdown</h5>
+                </div>
+                <div class="card-body p-4"><div class="chart-container-wrapper"><canvas id="priorityChart"></canvas></div></div>
             </div>
         </div>
     </div>
     
-    <!-- ==================== COMPLAINT STATISTICS ==================== -->
-    <div class="row mt-4">
+    <div class="row g-4 mb-5">
         <div class="col-12">
-            <h4 class="text-primary"><i class="fas fa-clipboard-list"></i> Complaint Statistics</h4>
-        </div>
-    </div>
-    
-    <div class="row mt-2">
-        <div class="col-md-4">
-            <div class="card bg-primary text-white">
-                <div class="card-body text-center">
-                    <h3>{{ total_complaints }}</h3>
-                    <p>Total Complaints</p>
+            <div class="card glass-card text-white border-0 shadow">
+                <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                    <h5><i class="fas fa-tags text-info me-2"></i>Context Distribution Vector by Category</h5>
                 </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-warning text-dark">
-                <div class="card-body text-center">
-                    <h3>{{ pending }}</h3>
-                    <p>Pending</p>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card bg-success text-white">
-                <div class="card-body text-center">
-                    <h3>{{ active }}</h3>
-                    <p>Active</p>
-                </div>
+                <div class="card-body p-4"><canvas id="categoryChart" height="120"></canvas></div>
             </div>
         </div>
     </div>
     
-    <div class="row mt-2">
-        <div class="col-md-12">
-            <div class="card bg-secondary text-white">
-                <div class="card-body text-center">
-                    <h3>{{ closed }}</h3>
-                    <p>Closed</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Complaint Charts -->
-    <div class="row mt-4">
-        <div class="col-md-6">
-            <div class="card bg-dark">
-                <div class="card-header"><h5><i class="fas fa-chart-pie"></i> Complaint Status</h5></div>
-                <div class="card-body"><canvas id="complaintStatusChart"></canvas></div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card bg-dark">
-                <div class="card-header"><h5><i class="fas fa-chart-bar"></i> Priority Distribution</h5></div>
-                <div class="card-body"><canvas id="priorityChart"></canvas></div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Category Chart -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card bg-dark">
-                <div class="card-header"><h5><i class="fas fa-tags"></i> Complaints by Category</h5></div>
-                <div class="card-body"><canvas id="categoryChart"></canvas></div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- ==================== ENGINEER PERFORMANCE ==================== -->
-    <div class="row mt-4">
+    <!-- ==================== FILTER-CONTROLLED STAFF PERFORMANCE CARDS ==================== -->
+    <div class="row mt-5 mb-2">
         <div class="col-12">
-            <h4 class="text-success"><i class="fas fa-tools"></i> Engineer Performance</h4>
+            <h4 class="text-light"><i class="fas fa-user-gear text-success me-2"></i>Live Resource Performance Monitors</h4>
         </div>
     </div>
     
-    <div class="row mt-2">
+    <!-- Parent Unified Row holding all filterable dynamic items -->
+    <div class="row g-3 mb-4" id="staffPerformanceGrid">
+        
+        <!-- Render Engineers -->
         {% for eng in engineer_performance %}
-        <div class="col-md-3">
-            <div class="card bg-dark">
-                <div class="card-header bg-success"><h6>{{ eng.name }}</h6></div>
-                <div class="card-body text-center">
-                    <div class="row">
-                        <div class="col-4">
-                            <h4 class="text-white">{{ eng.assigned }}</h4>
-                            <small>Total</small>
+        <div class="col-sm-6 col-md-4 col-lg-3 staff-row-item" data-role="engineer">
+            <div class="card glass-card text-white border-0 h-100 shadow-sm">
+                <div class="card-header bg-success bg-opacity-20 text-success border-bottom border-success border-opacity-25 py-3">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-helmet-safety me-2"></i>{{ eng.name }}</span>
+                        <span class="badge bg-success bg-opacity-70 text-white small" style="font-size:10px;">ENGINEER</span>
+                    </h6>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center py-4">
+                    <div class="row text-center">
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <h4 class="mb-1 text-white fw-bold">{{ eng.assigned }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Assigned</p>
+                        </div>
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <h4 class="mb-1 text-success fw-bold">{{ eng.resolved }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Resolved</p>
                         </div>
                         <div class="col-4">
-                            <h4 class="text-success">{{ eng.resolved }}</h4>
-                            <small>Closed</small>
+                            <h4 class="mb-1 text-warning fw-bold">{{ eng.active }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Active</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Render Technical Support Members -->
+        {% for tech in tech_support_performance %}
+        <div class="col-sm-6 col-md-4 col-lg-3 staff-row-item" data-role="tech">
+            <div class="card glass-card text-white border-0 h-100 shadow-sm">
+                <div class="card-header bg-primary bg-opacity-20 text-primary border-bottom border-primary border-opacity-25 py-3">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-desktop me-2"></i>{{ tech.name }}</span>
+                        <span class="badge bg-primary bg-opacity-70 text-white small" style="font-size:10px;">TECH SUPP</span>
+                    </h6>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center py-4">
+                    <div class="row text-center">
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <h4 class="mb-1 text-white fw-bold">{{ tech.assigned }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Assigned</p>
+                        </div>
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <h4 class="mb-1 text-success fw-bold">{{ tech.resolved }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Resolved</p>
                         </div>
                         <div class="col-4">
-                            <h4 class="text-warning">{{ eng.active }}</h4>
-                            <small>Active</small>
+                            <h4 class="mb-1 text-warning fw-bold">{{ tech.active }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Active</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+
+        <!-- Render HelpDesk Members -->
+        {% for hd in helpdesk_performance %}
+        <div class="col-sm-6 col-md-4 col-lg-3 staff-row-item" data-role="helpdesk">
+            <div class="card glass-card text-white border-0 h-100 shadow-sm">
+                <div class="card-header bg-info bg-opacity-10 text-info border-bottom border-info border-opacity-25 py-3">
+                    <h6 class="mb-0 d-flex justify-content-between align-items-center">
+                        <span><i class="fas fa-headset me-2"></i>{{ hd.name }}</span>
+                        <span class="badge bg-info bg-opacity-20 text-info small" style="font-size:10px;">HELPDESK</span>
+                    </h6>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-center py-4">
+                    <div class="row text-center">
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <h4 class="mb-1 text-white fw-bold">{{ hd.assigned }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Assigned</p>
+                        </div>
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <h4 class="mb-1 text-success fw-bold">{{ hd.resolved }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Resolved</p>
+                        </div>
+                        <div class="col-4">
+                            <h4 class="mb-1 text-warning fw-bold">{{ hd.active }}</h4>
+                            <p class="text-muted mb-0" style="font-size:11px;">Active</p>
                         </div>
                     </div>
                 </div>
@@ -172,111 +308,231 @@
         {% endfor %}
     </div>
     
-    <!-- Engineer Chart -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card bg-dark">
-                <div class="card-header"><h5><i class="fas fa-users"></i> Engineer Performance Comparison</h5></div>
-                <div class="card-body"><canvas id="engineerChart"></canvas></div>
+    <!-- DYNAMIC PERFORMANCE UNIFIED MATRIX GRAPH -->
+    <div class="row g-4 mb-5">
+        <div class="col-12">
+            <div class="card glass-card text-white border-0 shadow">
+                <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                    <h5><i class="fas fa-chart-bar text-success me-2"></i>Comparative Staff Chart</h5>
+                </div>
+                <div class="card-body p-4">
+                    <canvas id="staffPerformanceChart" height="100"></canvas>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Chart.js -->
+<!-- Chart.js Engine -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-    // User Role Chart
+    // System Chart Object Instances Global Reference Store
+    let masterPerformanceChartInstance = null;
+
+    // Dark layout standard options
+    const darkChartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { labels: { color: '#adb5bd', font: { family: 'system-ui' } } }
+        }
+    };
+
+    // User Role Distribution Graph Engine
     new Chart(document.getElementById('userRoleChart'), {
         type: 'doughnut',
         data: {
             labels: ['Engineers', 'Operators', 'HelpDesk', 'Admins'],
             datasets: [{
                 data: [{{ engineers }}, {{ operators }}, {{ helpdesk }}, {{ admins }}],
-                backgroundColor: ['#28a745', '#6c757d', '#17a2b8', '#dc3545']
+                backgroundColor: ['#28a745', '#0d6efd', '#17a2b8', '#dc3545'],
+                borderWidth: 0
             }]
-        }
+        },
+        options: darkChartOptions
     });
     
-    // User Status Chart
+    // Account Status Monitor Graph
     new Chart(document.getElementById('userStatusChart'), {
         type: 'bar',
         data: {
-            labels: ['Approved', 'Pending'],
+            labels: ['Approved Status', 'Pending Verification'],
             datasets: [{
-                label: 'Users',
+                label: 'System Profiles Count',
                 data: [{{ approved_users }}, {{ pending_users }}],
-                backgroundColor: ['#28a745', '#ffc107']
+                backgroundColor: ['#198754', '#ffc107'],
+                borderRadius: 6
             }]
         },
-        options: { scales: { y: { beginAtZero: true } } }
-    });
-    
-    // Complaint Status Chart - ONLY Pending, Active, Closed
-    new Chart(document.getElementById('complaintStatusChart'), {
-        type: 'pie',
-        data: {
-            labels: ['Pending', 'Active', 'Closed'],
-            datasets: [{
-                data: [{{ pending }}, {{ active }}, {{ closed }}],
-                backgroundColor: ['#ffc107', '#28a745', '#6c757d']
-            }]
+        options: {
+            ...darkChartOptions,
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#adb5bd' } },
+                x: { grid: { display: false }, ticks: { color: '#adb5bd' } }
+            }
         }
     });
     
-    // Priority Chart
+    // Lifecycle Settlement Graph
+    new Chart(document.getElementById('complaintStatusChart'), {
+        type: 'pie',
+        data: {
+            labels: ['Pending Triaging', 'Live Active', 'Resolved Closed'],
+            datasets: [{
+                data: [{{ pending }}, {{ active }}, {{ closed }}],
+                backgroundColor: ['#ffc107', '#0d6efd', '#6c757d'],
+                borderWidth: 0
+            }]
+        },
+        options: darkChartOptions
+    });
+    
+    // Priority Vector Breakdown
     new Chart(document.getElementById('priorityChart'), {
         type: 'bar',
         data: {
-            labels: ['High', 'Medium', 'Low'],
+            labels: ['Critical High', 'Medium Priority', 'Routine Low'],
             datasets: [{
-                label: 'Complaints',
+                label: 'Active Cases Logged',
                 data: [{{ high_priority }}, {{ medium_priority }}, {{ low_priority }}],
-                backgroundColor: ['#dc3545', '#ffc107', '#17a2b8']
+                backgroundColor: ['#dc3545', '#ffc107', '#0dcaf0'],
+                borderRadius: 6
             }]
         },
-        options: { scales: { y: { beginAtZero: true } } }
+        options: {
+            ...darkChartOptions,
+            scales: {
+                y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#adb5bd' } },
+                x: { grid: { display: false }, ticks: { color: '#adb5bd' } }
+            }
+        }
     });
     
-    // Category Chart
+    // Context Vector Mapping Configuration
     new Chart(document.getElementById('categoryChart'), {
         type: 'bar',
         data: {
             labels: {{ category_counts.keys()|list }},
             datasets: [{
-                label: 'Complaints',
+                label: 'Complaints Counter Volume',
                 data: {{ category_counts.values()|list }},
-                backgroundColor: '#0dcaf0'
+                backgroundColor: 'rgba(13, 202, 240, 0.75)',
+                borderRadius: 5
             }]
         },
-        options: { indexAxis: 'y', scales: { x: { beginAtZero: true } } }
+        options: {
+            responsive: true,
+            indexAxis: 'y',
+            plugins: { legend: { labels: { color: '#adb5bd' } } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#adb5bd' } },
+                y: { grid: { display: false }, ticks: { color: '#adb5bd' } }
+            }
+        }
     });
-    
-    // Engineer Performance Chart
-    new Chart(document.getElementById('engineerChart'), {
-        type: 'bar',
-        data: {
-            labels: {{ engineer_performance|map(attribute='name')|list }},
-            datasets: [
-                {
-                    label: 'Total',
-                    data: {{ engineer_performance|map(attribute='assigned')|list }},
-                    backgroundColor: '#0d6efd'
-                },
-                {
-                    label: 'Closed',
-                    data: {{ engineer_performance|map(attribute='resolved')|list }},
-                    backgroundColor: '#198754'
-                },
-                {
-                    label: 'Active',
-                    data: {{ engineer_performance|map(attribute='active')|list }},
-                    backgroundColor: '#ffc107'
-                }
-            ]
+
+    // --- INTERACTIVE MULTI-ROLE DATA MATRICES ENGINE ---
+    // Extracting datasets passed directly down from Flask context
+    const sourceStaffPerformanceData = {
+        engineer: {
+            names: {{ engineer_performance|map(attribute='name')|list }},
+            assigned: {{ engineer_performance|map(attribute='assigned')|list }},
+            resolved: {{ engineer_performance|map(attribute='resolved')|list }},
+            active: {{ engineer_performance|map(attribute='active')|list }}
         },
-        options: { scales: { y: { beginAtZero: true } } }
+        tech: {
+            names: {{ tech_support_performance|map(attribute='name')|list }},
+            assigned: {{ tech_support_performance|map(attribute='assigned')|list }},
+            resolved: {{ tech_support_performance|map(attribute='resolved')|list }},
+            active: {{ tech_support_performance|map(attribute='active')|list }}
+        },
+        helpdesk: {
+            names: {{ helpdesk_performance|map(attribute='name')|list }},
+            assigned: {{ helpdesk_performance|map(attribute='assigned')|list }},
+            resolved: {{ helpdesk_performance|map(attribute='resolved')|list }},
+            active: {{ helpdesk_performance|map(attribute='active')|list }}
+        }
+    };
+
+    // Client-side dynamic visual card state updates and chart mutation handler
+    function applyStaffFilter(selectedTargetRole, componentButtonReference) {
+        // Step 1: Update UI control buttons active states styling
+        const filterControlsGroup = componentButtonReference.parentElement.querySelectorAll('.filter-btn');
+        filterControlsGroup.forEach(btn => {
+            btn.classList.remove('btn-primary');
+            btn.classList.add('btn-outline-light');
+        });
+        componentButtonReference.classList.remove('btn-outline-light');
+        componentButtonReference.classList.add('btn-primary');
+
+        // Step 2: Handle visibility transitions of Cards in grid elements
+        const htmlCardNodeCollection = document.querySelectorAll('#staffPerformanceGrid .staff-row-item');
+        htmlCardNodeCollection.forEach(cardNode => {
+            const nodeMetadataRole = cardNode.getAttribute('data-role');
+            if (selectedTargetRole === 'all' || nodeMetadataRole === selectedTargetRole) {
+                cardNode.style.display = "block";
+            } else {
+                cardNode.style.display = "none";
+            }
+        });
+
+        // Step 3: Mutate and compile data mappings to reconstruct chart view variables
+        let targetedLabels = [];
+        let compoundAssigned = [];
+        let compoundResolved = [];
+        let compoundActive = [];
+
+        const runtimeKeysToExecute = selectedTargetRole === 'all' ? ['engineer', 'tech', 'helpdesk'] : [selectedTargetRole];
+        
+        runtimeKeysToExecute.forEach(key => {
+            targetedLabels.push(...sourceStaffPerformanceData[key].names);
+            compoundAssigned.push(...sourceStaffPerformanceData[key].assigned);
+            compoundResolved.push(...sourceStaffPerformanceData[key].resolved);
+            compoundActive.push(...sourceStaffPerformanceData[key].active);
+        });
+
+        document.getElementById('filterStatus').innerText = `Filtering Isolated Matrix View: ${selectedTargetRole.toUpperCase()}`;
+
+        // Rebuild or update the Chart instances safely
+        if (masterPerformanceChartInstance) {
+            masterPerformanceChartInstance.data.labels = targetedLabels;
+            masterPerformanceChartInstance.data.datasets[0].data = compoundAssigned;
+            masterPerformanceChartInstance.data.datasets[1].data = compoundResolved;
+            masterPerformanceChartInstance.data.datasets[2].data = compoundActive;
+            masterPerformanceChartInstance.update();
+        }
+    }
+
+    // Initialize the primary chart view model container at initial viewport run
+    window.addEventListener('DOMContentLoaded', () => {
+        const primaryContextElement = document.getElementById('staffPerformanceChart');
+        
+        // Collate all vectors for the base layout initialization map
+        const unifiedNames = [...sourceStaffPerformanceData.engineer.names, ...sourceStaffPerformanceData.tech.names, ...sourceStaffPerformanceData.helpdesk.names];
+        const unifiedAssigned = [...sourceStaffPerformanceData.engineer.assigned, ...sourceStaffPerformanceData.tech.assigned, ...sourceStaffPerformanceData.helpdesk.assigned];
+        const unifiedResolved = [...sourceStaffPerformanceData.engineer.resolved, ...sourceStaffPerformanceData.tech.resolved, ...sourceStaffPerformanceData.helpdesk.resolved];
+        const unifiedActive = [...sourceStaffPerformanceData.engineer.active, ...sourceStaffPerformanceData.tech.active, ...sourceStaffPerformanceData.helpdesk.active];
+
+        masterPerformanceChartInstance = new Chart(primaryContextElement, {
+            type: 'bar',
+            data: {
+                labels: unifiedNames,
+                datasets: [
+                    { label: 'Total Tickets Assigned', data: unifiedAssigned, backgroundColor: '#0d6efd', borderRadius: 4 },
+                    { label: 'Settled Closed Cases', data: unifiedResolved, backgroundColor: '#198754', borderRadius: 4 },
+                    { label: 'Active Pipeline Hold', data: unifiedActive, backgroundColor: '#ffc107', borderRadius: 4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: { legend: { labels: { color: '#adb5bd' } } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#adb5bd' } },
+                    x: { grid: { display: false }, ticks: { color: '#adb5bd' } }
+                }
+            }
+        });
     });
 </script>
 {% endblock %}

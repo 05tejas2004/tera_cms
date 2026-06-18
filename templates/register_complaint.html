@@ -13,21 +13,49 @@
                             <label class="form-label">Complaint Title</label>
                             <input type="text" name="title" class="form-control" required placeholder="Enter complaint title">
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Category</label>
-                            <select name="category" class="form-select">
-                                <option>C-Fail</option>
-                                <option>Single Phase</option>
-                                <option>Power Cable Cut</option>
-                                <option>Power Supply Issue</option>
-                                <option>Other</option>
-                            </select>
-                        </div>
+                        <div class="col-md-12">
+    <label class="form-label">Category</label>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="ITMS">
+        <label class="form-check-label">ITMS</label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="IVMS">
+        <label class="form-check-label">IVMS</label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="ATCS">
+        <label class="form-check-label">ATCS</label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="VAMS">
+        <label class="form-check-label">VAMS</label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="PAS">
+        <label class="form-check-label">PAS</label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="Work Station">
+        <label class="form-check-label">Work Station</label>
+    </div>
+
+    <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="category[]" value="IP Phones">
+        <label class="form-check-label">IP Phones</label>
+    </div>
+</div>
                         <div class="col-md-6">
                             <label class="form-label">Priority</label>
                             <select name="priority" class="form-select">
-                                <option>Low</option>
                                 <option>Medium</option>
+                                <option>Low</option>
                                 <option>High</option>
                             </select>
                         </div>

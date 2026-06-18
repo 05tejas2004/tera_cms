@@ -2,18 +2,19 @@
 <html lang="en" data-bs-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <!-- Mobile Responsive Meta Tags -->
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#1a1a1a">
     <meta name="description" content="TERA CMS - Complaint Management System">
+
+    <title>Tera Software Power Complaint Registration System</title>
     
-    <title>Tera Software Power Complaint Registeration System </title>
     <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
-    <meta name="theme-color" content="#1a1a1a">
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='Tera_Logo.png') }}">
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
@@ -298,17 +299,14 @@
 
         /* Touch-friendly for all mobile */
         @media (hover: none) and (pointer: coarse) {
-            /* Larger touch targets */
             .btn, .form-control, select {
                 min-height: 48px;
             }
             
-            /* Tap highlight */
             * {
                 -webkit-tap-highlight-color: rgba(255, 255, 255, 0.1);
             }
             
-            /* Smooth scrolling */
             html {
                 scroll-behavior: smooth;
             }
@@ -377,45 +375,63 @@
     </nav>
     
     <div class="container mt-4">
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        <div class="container mt-2">
-        {% for category, message in messages %}
-            {% if category == 'success' %}
-            <div class="alert alert-success alert-dismissible fade show">
-                <i class="fas fa-check-circle"></i> {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-2">
+            {% for category, message in messages %}
+                {% if category == 'success' %}
+                <div class="alert alert-success alert-dismissible fade show">
+                    <i class="fas fa-check-circle"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% elif category == 'error' %}
+                <div class="alert alert-danger alert-dismissible fade show">
+                    <i class="fas fa-exclamation-circle"></i> {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% else %}
+                <div class="alert alert-info alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+                {% endif %}
+            {% endfor %}
             </div>
-            {% elif category == 'error' %}
-            <div class="alert alert-danger alert-dismissible fade show">
-                <i class="fas fa-exclamation-circle"></i> {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% else %}
-            <div class="alert alert-info alert-dismissible fade show">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-            {% endif %}
-        {% endfor %}
-        </div>
-    {% endif %}
-{% endwith %}
-        {% block content %}{% endblock %}
+        {% endif %}
+    {% endwith %} {% block content %}{% endblock %}
     </div>
     
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 9999;">
+        <div id="notificationToast" class="toast border border-info bg-dark text-white" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="toast-header bg-info text-dark">
+                <strong class="me-auto" id="toastTitle">🔊 System Update</strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body text-white" id="toastMessage">
+                Notification payload placeholder.
+            </div>
+        </div>
+    </div>
+
+    <audio id="notificationSound" src="https://actions.google.com/sounds/v1/alerts/digital_watch_alarm_long.ogg" preload="auto"></audio>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+
     <script>
-        // Service Worker Registration
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/service-worker.js')
-                    .then(reg => console.log('Service Worker Registered'))
-                    .catch(err => console.log(err));
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register("/sw.js")
+                    .then(function(reg) {
+                        console.log("PWABuilder Engine Status: Active on root scope: ", reg.scope);
+                    }).catch(function(err) {
+                        console.log("PWABuilder Engine Status: Registration halted: ", err);
+                    });
             });
         }
+    </script>
 
-        // PWA Install Prompt
+    <script>
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -438,17 +454,14 @@
             }
         }
 
-        // Detect Mobile
         function isMobile() {
             return window.innerWidth <= 768 || 'ontouchstart' in window;
         }
 
-        // Add mobile class to body
         if (isMobile()) {
             document.body.classList.add('is-mobile');
         }
 
-        // HandleResize
         window.addEventListener('resize', () => {
             if (isMobile()) {
                 document.body.classList.add('is-mobile');
@@ -458,10 +471,222 @@
         });
     </script>
     
-    <!-- Install Banner (hidden by default) -->
     <div class="install-banner">
         <span>Install TERA CMS as an App</span>
         <button class="btn btn-primary btn-sm" onclick="installPWA()">Install</button>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var socket = io();
+            
+            const toastEl = document.getElementById('notificationToast');
+            const toastTitle = document.getElementById('toastTitle');
+            const toastMessage = document.getElementById('toastMessage');
+            let bootstrapToast = null;
+            
+            if (toastEl) {
+                bootstrapToast = new bootstrap.Toast(toastEl, { delay: 8000 });
+            }
+
+            const notificationSound = document.getElementById('notificationSound');
+
+            function triggerAlertSound() {
+                if (notificationSound) {
+                    notificationSound.play().catch(function(error) {
+                        console.log("Autoplay blocked. Interaction requested first.");
+                    });
+                }
+            }
+
+            socket.on('new_complaint', function (data) {
+                console.log("New complaint received:", data);
+                triggerAlertSound();
+
+                if (bootstrapToast && toastMessage && toastTitle) {
+                    toastTitle.innerHTML = `🚨 New Complaint Arrived`;
+                    toastMessage.innerHTML = `
+                        <div class="fw-bold text-info">${data.title || 'No Title'}</div>
+                        <div class="small text-muted my-1">ID: ${data.complaint_id} | Location: ${data.location}</div>
+                        <span class="badge bg-danger mt-1">Priority: ${data.priority}</span>
+                    `;
+                    bootstrapToast.show();
+                }
+
+                const tableBody = document.querySelector('#allComplaintsTable tbody');
+                if (tableBody) {
+                    const emptyRow = document.getElementById('emptySearchRow');
+                    if (emptyRow) emptyRow.style.display = 'none';
+
+                    let priorityBadge = `<span class="badge bg-info text-dark">Low</span>`;
+                    if (data.priority === 'High') {
+                        priorityBadge = `<span class="badge bg-danger">High</span>`;
+                    } else if (data.priority === 'Medium') {
+                        priorityBadge = `<span class="badge bg-warning text-dark">Medium</span>`;
+                    }
+
+                    const newRowHtml = `
+                        <tr id="complaint-row-${data.id}" class="table-row-new" style="transition: background-color 1s ease; background-color: #1c3d26;">
+                            <td><strong>${data.complaint_id}</strong></td>
+                            <td>${data.title}</td>
+                            <td>
+                                <div style="max-width: 180px; max-height: 75px; overflow-y: auto;" class="small text-muted text-break">
+                                    ${data.description || '-'}
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary text-light">
+                                    <i class="fas fa-user-edit"></i> ${data.creator_name || 'System'}
+                                </span>
+                            </td>
+                            <td>${data.category}</td>
+                            <td>${data.location}</td>
+                            <td>${priorityBadge}</td>
+                            <td><span class="text-muted">-</span></td>
+                            <td class="small text-break">-</td>
+                            <td>Just Now</td>
+                            <td class="status-badge-cell">
+                                <span class="badge bg-warning text-dark">Pending</span>
+                            </td>
+                            <td>
+                                <form method="POST" action="/update_complaint/${data.id}" class="d-flex flex-column gap-1" style="max-width: 150px;">
+                                    <select name="status" class="form-control form-control-sm bg-dark text-light">
+                                        <option value="Resolved">Resolved</option>
+                                        <option value="Active">Reopen (Active)</option>
+                                        <option value="Closed">Verify & Close</option>
+                                    </select>
+                                    <textarea name="reason" class="form-control form-control-sm bg-dark text-light" rows="2" placeholder="Reason for change..." required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-warning w-100">Update Status</button>
+                                </form>
+                            </td>
+                        </tr>
+                    `;
+
+                    tableBody.insertAdjacentHTML('afterbegin', newRowHtml);
+
+                    setTimeout(() => {
+                        const addedRow = document.getElementById(`complaint-row-${data.id}`);
+                        if (addedRow) addedRow.style.backgroundColor = '';
+                    }, 3000);
+                }
+            });
+
+            socket.on('complaint_updated', function (data) {
+                console.log("Complaint update broadcast caught:", data);
+                
+                if (bootstrapToast && toastMessage && toastTitle) {
+                    toastTitle.innerHTML = `🔄 Complaint Status Updated`;
+                    toastMessage.innerHTML = `
+                        <div>Complaint ID <strong>${data.complaint_id}</strong> changed status to:</div>
+                        <div class="mt-2"><span class="badge bg-warning text-dark">${data.status}</span></div>
+                    `;
+                    bootstrapToast.show();
+                }
+
+                const targetRow = document.getElementById(`complaint-row-${data.id}`);
+                if (targetRow) {
+                    const statusCell = targetRow.querySelector('.status-badge-cell');
+                    if (statusCell) {
+                        let badgeClass = 'bg-danger';
+                        if (data.status === 'Pending') badgeClass = 'bg-warning text-dark';
+                        else if (data.status === 'Active') badgeClass = 'bg-primary';
+                        else if (data.status === 'Resolved') badgeClass = 'bg-success';
+                        else if (data.status === 'Closed') badgeClass = 'bg-secondary';
+
+                        statusCell.innerHTML = `<span class="badge ${badgeClass}">${data.status}</span>`;
+                    }
+
+                    targetRow.style.transition = "background-color 0.4s ease";
+                    targetRow.style.backgroundColor = "#3d3213"; 
+                    setTimeout(() => { targetRow.style.backgroundColor = ""; }, 2000);
+                }
+            });
+
+            const searchField = document.getElementById('allComplaintsSearch');
+            if (searchField) {
+                searchField.addEventListener('input', function () {
+                    const value = this.value.toLowerCase().trim();
+                    const tableRows = document.querySelectorAll('#allComplaintsTable tbody tr:not(#emptySearchRow)');
+                    const emptyRowFallback = document.getElementById('emptySearchRow');
+                    let recordsFound = 0;
+
+                    tableRows.forEach(row => {
+                        const rawText = row.textContent.toLowerCase();
+                        if (rawText.includes(value)) {
+                            row.style.display = '';
+                            recordsFound++;
+                        } else {
+                            row.style.display = 'none';
+                        }
+                    });
+
+                    if (emptyRowFallback) {
+                        emptyRowFallback.style.display = (recordsFound === 0 && value !== '') ? '' : 'none';
+                    }
+                });
+            }
+        });
+    </script>
+
+    <script>
+        function urlBase64ToUint8Array(base64String) {
+            const padding = '='.repeat((4 - base64String.length % 4) % 4);
+            const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = window.atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray;
+        }
+
+        function initPushNotificationSubscription() {
+            if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+                console.warn('Push notification architectures are unsupported on this system.');
+                return;
+            }
+
+            navigator.serviceWorker.ready.then(function(registration) {
+                const VAPID_PUBLIC_KEY = "YOUR_VAPID_PUBLIC_KEY_HERE"; 
+                const convertedApplicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
+
+                registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: convertedApplicationServerKey
+                })
+                .then(function(subscription) {
+                    console.log('Device connected to remote notification gateway router.');
+                    
+                    return fetch('/api/save-subscription', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(subscription)
+                    });
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Backend registration synchronization was refused.');
+                    console.log('Secure endpoint subscription tracking complete.');
+                })
+                .catch(function(err) {
+                    console.error('Failed to update remote subscriber maps: ', err);
+                });
+            });
+        }
+
+        if (Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    initPushNotificationSubscription();
+                }
+            });
+        } else if (Notification.permission === 'granted') {
+            window.addEventListener('load', initPushNotificationSubscription);
+        }
+    </script>
+
+    {% if current_user.is_authenticated %}
+        {% include "_notifications.html" %}
+    {% endif %}
+
 </body>
 </html>

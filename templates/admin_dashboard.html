@@ -3,7 +3,6 @@
 <div class="container mt-4">
     <h2><i class="fas fa-shield-alt"></i> Admin Dashboard</h2>
     
-    <!-- Filter Status Alert -->
     {% if request.args.get('status') %}
     <div class="alert alert-info d-flex justify-content-between align-items-center mt-3">
         <span>
@@ -15,306 +14,330 @@
         </a>
     </div>
     {% endif %}
-    
-    <!-- ==================== COMPLAINT STATS ==================== -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <h4 class="text-primary mb-3"><i class="fas fa-clipboard-list"></i> Complaint Statistics</h4>
+
+    <div id="live-dashboard-container">
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h4 class="text-primary mb-3"><i class="fas fa-clipboard-list"></i> Complaint Statistics</h4>
+            </div>
         </div>
-    </div>
-    
-    <div class="row g-3">
-        <div class="col-6 col-md-3">
-            <a href="{{ url_for('admin_dashboard') }}" class="text-decoration-none">
-                <div class="card bg-primary text-white h-100 shadow">
-                    <div class="card-body text-center py-4">
-                        <h1 class="display-4">{{ total }}</h1>
-                        <p class="mb-0">Total Complaints</p>
+        
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <a href="{{ url_for('admin_dashboard') }}" class="text-decoration-none">
+                    <div class="card bg-primary text-white h-100 shadow">
+                        <div class="card-body text-center py-4">
+                            <h1 class="display-4">{{ total }}</h1>
+                            <p class="mb-0">Total Complaints</p>
+                        </div>
                     </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_for('admin_dashboard') }}?status=Pending" class="text-decoration-none">
-                <div class="card bg-warning text-dark h-100 shadow">
-                    <div class="card-body text-center py-4">
-                        <h1 class="display-4">{{ pending }}</h1>
-                        <p class="mb-0">Pending</p>
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="{{ url_for('admin_dashboard') }}?status=Pending" class="text-decoration-none">
+                    <div class="card bg-warning text-dark h-100 shadow">
+                        <div class="card-body text-center py-4">
+                            <h1 class="display-4">{{ pending }}</h1>
+                            <p class="mb-0">Pending</p>
+                        </div>
                     </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_for('admin_dashboard') }}?status=Active" class="text-decoration-none">
-                <div class="card bg-success text-white h-100 shadow">
-                    <div class="card-body text-center py-4">
-                        <h1 class="display-4">{{ active }}</h1>
-                        <p class="mb-0">Active</p>
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="{{ url_for('admin_dashboard') }}?status=Active" class="text-decoration-none">
+                    <div class="card bg-success text-white h-100 shadow">
+                        <div class="card-body text-center py-4">
+                            <h1 class="display-4">{{ active }}</h1>
+                            <p class="mb-0">Active</p>
+                        </div>
                     </div>
-                </div>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_for('admin_dashboard') }}?status=Closed" class="text-decoration-none">
-                <div class="card bg-secondary text-white h-100 shadow">
-                    <div class="card-body text-center py-4">
-                        <h1 class="display-4">{{ closed }}</h1>
-                        <p class="mb-0">Closed</p>
+                </a>
+            </div>
+            <div class="col-6 col-md-3">
+                <a href="{{ url_for('admin_dashboard') }}?status=Closed" class="text-decoration-none">
+                    <div class="card bg-secondary text-white h-100 shadow">
+                        <div class="card-body text-center py-4">
+                            <h1 class="display-4">{{ closed }}</h1>
+                            <p class="mb-0">Closed</p>
+                        </div>
                     </div>
-                </div>
-            </a>
+                </a>
+            </div>
         </div>
-    </div>
-    
-    <!-- ==================== ACTION BUTTONS ==================== -->
+        </div>
     <div class="row mt-5">
         <div class="col-12">
             <h4 class="text-info mb-3"><i class="fas fa-cogs"></i> Quick Actions</h4>
         </div>
     </div>
     
-    <div class="row g-3">
-        <div class="col-6 col-md-3">
+    <div class="row g-3 mb-5">
+        <div class="col-12 col-md-6">
             <a href="{{ url_for('user_management') }}" class="btn btn-outline-light w-100 py-4 h-100">
                 <i class="fas fa-users fa-2x mb-2"></i>
                 <h5>User Management</h5>
                 <small class="text-muted">View, Approve, Delete</small>
             </a>
         </div>
-        <div class="col-6 col-md-3">
+        <div class="col-12 col-md-6">
             <a href="{{ url_for('admin_statistics') }}" class="btn btn-outline-warning w-100 py-4 h-100">
                 <i class="fas fa-chart-bar fa-2x mb-2"></i>
                 <h5>Statistics</h5>
                 <small class="text-muted">Charts & Graphs</small>
             </a>
         </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_for('upload_users') }}" class="btn btn-outline-info w-100 py-4 h-100">
-                <i class="fas fa-file-excel fa-2x mb-2"></i>
-                <h5>Bulk Upload</h5>
-                <small class="text-muted">Import from Excel</small>
-            </a>
-        </div>
-        <div class="col-6 col-md-3">
-            <a href="{{ url_for('generate_report') }}" class="btn btn-outline-success w-100 py-4 h-100">
-                <i class="fas fa-file-pdf fa-2x mb-2"></i>
-                <h5>Generate Report</h5>
-                <small class="text-muted">Download PDF</small>
-            </a>
-        </div>
     </div>
-    
-    <!-- ==================== PENDING USERS ==================== -->
-    <div class="row mt-5">
-        <div class="col-12">
-            <div class="card bg-dark shadow">
-                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0"><i class="fas fa-user-clock"></i> Pending User Approvals</h5>
-                    <span class="badge bg-dark">{{ pending_users|length }}</span>
-                </div>
-                <div class="card-body">
-                    {% if pending_users %}
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Username</th>
-                                    <th>Role</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for user in pending_users %}
-                                <tr>
-                                    <td>{{ user.name }}</td>
-                                    <td>{{ user.username }}</td>
-                                    <td><span class="badge bg-info">{{ user.role }}</span></td>
-                                    <td>
-                                        <a href="{{ url_for('approve_user', user_id=user.id) }}" class="btn btn-success btn-sm">
-                                            <i class="fas fa-check"></i> Approve
-                                        </a>
-                                        <a href="{{ url_for('reject_user', user_id=user.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Reject this user?')">
-                                            <i class="fas fa-times"></i> Reject
-                                        </a>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+        
+        <div class="row mt-5">
+            <div class="col-12">
+                <div class="card bg-dark shadow">
+                    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-user-clock"></i> Pending User Approvals</h5>
+                        <span class="badge bg-dark">{{ pending_users|length }}</span>
                     </div>
-                    {% else %}
-                    <p class="text-muted text-center py-3"><i class="fas fa-check-circle"></i> No pending users.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- ==================== COMPLAINTS TABLE ==================== -->
-    <div class="row mt-4">
-        <div class="col-12">
-            <div class="card bg-dark shadow">
-                <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
-                    <h5 class="mb-0">
-                        <i class="fas fa-list"></i> 
-                        {% if request.args.get('status') %}
-                            {{ request.args.get('status') }} Complaints
+                    <div class="card-body">
+                        {% if pending_users %}
+                        <div class="table-responsive">
+                            <table class="table table-dark table-striped table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Username</th>
+                                        <th>Role</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for user in pending_users %}
+                                    <tr>
+                                        <td>{{ user.name }}</td>
+                                        <td>{{ user.username }}</td>
+                                        <td><span class="badge bg-info">{{ user.role }}</span></td>
+                                        <td>
+                                            <a href="{{ url_for('approve_user', user_id=user.id) }}" class="btn btn-success btn-sm">
+                                                <i class="fas fa-check"></i> Approve
+                                            </a>
+                                            <a href="{{ url_for('reject_user', user_id=user.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Reject this user?')">
+                                                <i class="fas fa-times"></i> Reject
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
-                            All Complaints
+                        <p class="text-muted text-center py-3"><i class="fas fa-check-circle"></i> No pending users.</p>
                         {% endif %}
-                    </h5>
-                    <span class="badge bg-dark">{{ filtered_complaints|length }}</span>
-                </div>
-                
-                <!-- Search Filter -->
-                <div class="card-body pb-0">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="input-group">
-                                <span class="input-group-text bg-secondary"><i class="fas fa-search"></i></span>
-                                <input type="text" id="adminSearch" class="form-control" placeholder="Search complaints..." onkeyup="filterAdmin()">
-                            </div>
-                        </div>
-                        <div class="col-md-6 text-end mt-2 mt-md-0">
-                            {% if request.args.get('status') %}
-                            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-danger">
-                                <i class="fas fa-times"></i> Clear Filter
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table table-dark table-striped table-hover" id="adminTable">
-                            <thead class="table-secondary">
-                                <tr>
-                                    <th style="width: 7%;">ID</th>
-                                    <th style="width: 12%;">Title</th>
-                                    <th style="width: 8%;">Category</th>
-                                    <th style="width: 8%;">Location</th>
-                                    <th style="width: 7%;">Status</th>
-                                    <th style="width: 9%;">Resolved By</th>
-                                    <th style="width: 8%;">Role</th>
-                                    <th style="width: 7%;">Created</th>
-                                    <th style="width: 8%;">Accepted</th>
-                                    <th style="width: 6%;">Time</th>
-                                    <th style="width: 10%;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for c in filtered_complaints %}
-                                <tr class="admin-row">
-                                    <td><strong>{{ c.complaint_id }}</strong></td>
-                                    <td>{{ c.title[:20] }}</td>
-                                    <td><span class="badge bg-secondary">{{ c.category[:10] }}</span></td>
-                                    <td>{{ c.location[:12] }}</td>
-                                    <td>
-                                        {% if c.status == 'Pending' %}
-                                        <span class="badge bg-warning text-dark">Pending</span>
-                                        {% elif c.status == 'Active' %}
-                                        <span class="badge bg-primary">Active</span>
-                                        {% elif c.status == 'Closed' %}
-                                        <span class="badge bg-success">Closed</span>
-                                        {% else %}
-                                        <span class="badge bg-secondary">{{ c.status }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if c.assigned_to %}
-                                            {% for u in all_users %}
-                                                {% if u.id == c.assigned_to %}
-                                                <span class="badge bg-success">{{ u.name[:10] }}</span>
-                                                {% endif %}
-                                            {% endfor %}
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if c.assigned_to %}
-                                            {% for u in all_users %}
-                                                {% if u.id == c.assigned_to %}
-                                                <span class="badge bg-info">{{ u.role[:8] }}</span>
-                                                {% endif %}
-                                            {% endfor %}
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '-' }}</td>
-                                    <td>
-                                        {% if c.assigned_at %}
-                                        <span class="badge bg-info">{{ c.assigned_at.strftime('%Y-%m-%d') }}</span>
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if c.created_at and c.assigned_at %}
-                                            {% set diff = c.assigned_at - c.created_at %}
-                                            {% set hours = (diff.total_seconds() / 3600)|int %}
-                                            {% if hours < 1 %}
-                                                <span class="badge bg-warning text-dark">{{ (diff.total_seconds() / 60)|int }}m</span>
-                                            {% elif hours < 24 %}
-                                                <span class="badge bg-primary">{{ hours }}h</span>
-                                            {% else %}
-                                                <span class="badge bg-success">{{ (hours / 24)|int }}d</span>
-                                            {% endif %}
-                                        {% elif c.created_at %}
-                                            {% set diff = current_time - c.created_at %}
-                                            {% set hours = (diff.total_seconds() / 3600)|int %}
-                                            {% if hours < 1 %}
-                                                <span class="badge bg-warning text-dark">{{ (diff.total_seconds() / 60)|int }}m</span>
-                                            {% elif hours < 24 %}
-                                                <span class="badge bg-primary">{{ hours }}h</span>
-                                            {% else %}
-                                                <span class="badge bg-danger">{{ (hours / 24)|int }}d</span>
-                                            {% endif %}
-                                        {% else %}
-                                        <span class="text-muted">-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <form method="POST" action="{{ url_for('admin_update_status', comp_id=c.id) }}" class="d-flex gap-1">
-                                            <select name="status" class="form-control form-control-sm bg-dark text-light" style="width: 75px;">
-                                                <option value="Pending" {% if c.status == 'Pending' %}selected{% endif %}>Pending</option>
-                                                <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Active</option>
-                                                <option value="Closed" {% if c.status == 'Closed' %}selected{% endif %}>Close</option>
-                                            </select>
-                                            <button type="submit" class="btn btn-sm btn-primary">
-                                                <i class="fas fa-check"></i>
-                                            </button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        
-                        <div id="noAdminResults" class="text-center py-3" style="display: none;">
-                            <i class="fas fa-search text-muted" style="font-size: 2rem;"></i>
-                            <p class="mt-2 text-muted">No matching complaints found.</p>
-                        </div>
                     </div>
                 </div>
             </div>
+        </div>
+        
+        <div class="row mt-4">
+    <div class="col-12">
+        <div class="card bg-dark shadow">
+            <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-list"></i> 
+                    {% if request.args.get('status') %}
+                        {{ request.args.get('status') }} Complaints
+                    {% else %}
+                        All Complaints
+                    {% endif %}
+                </h5>
+                <span class="badge bg-dark">{{ filtered_complaints|length }}</span>
+            </div>
+            
+            <div class="card-body pb-0">
+                <div class="row align-items-center">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <span class="input-group-text bg-secondary text-white"><i class="fas fa-search"></i></span>
+                            <input type="text" id="adminSearch" class="form-control" placeholder="Search complaints..." onkeyup="filterAdmin()">
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+    <h5 class="text-light mb-0">Filtered Results</h5>
+    
+    <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="text-light mb-0">Get Report </h5>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('generate_report', format='excel', status=request.args.get('status', ''), search_filter=request.args.get('search_filter', '')) }}" class="btn btn-sm btn-success d-flex align-items-center gap-1">
+            <i class="fas fa-file-excel"></i> Export Excel
+        </a>
+        
+        <a href="{{ url_for('generate_report', format='pdf', status=request.args.get('status', ''), search_filter=request.args.get('search_filter', '')) }}" class="btn btn-sm btn-danger d-flex align-items-center gap-1">
+            <i class="fas fa-file-pdf"></i> Export PDF
+        </a>
+    </div>
+</div>
+
+
+                </div>
+            </div>
+            
+            <div class="card-body">
+    <div class="table-responsive">
+        <table class="table table-dark table-striped table-hover" id="adminTable">
+            <thead class="table-secondary">
+                <tr>
+                    <th style="width:10%">Complaint ID</th>
+                    <th style="width:10%">Title</th>
+                    <th>Description</th>
+                    <th style="width:8%">Category</th>
+                    <th style="width:10%">Location</th>
+                    <th style="width:10%">Accepted by</th> <th style="width:10%">Resolved by</th> <th style="width:8%">Created</th>
+                    <th style="width:8%">Accepted</th>
+                    <th style="width:6%">Time</th>
+                    <th style="width:14%">Reason</th>
+                    <th style="width:10%">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in filtered_complaints %}
+                <tr class="admin-row">
+                    <td>
+    <a href="{{ url_for('view_single_complaint', id=c.id) }}" target="_blank" class="text-info font-weight-bold text-decoration-none">
+        <i class="fas fa-external-link-alt small me-1"></i> <strong>{{ c.complaint_id }}</strong>
+    </a>
+</td>
+                    <td>{{ c.title[:20] }}</td>
+                    <td>
+                        <div style="max-width: 180px; max-height: 75px; overflow-y: auto;" class="small text-muted text-break">
+                            {{ c.description or '-' }}
+                        </div>
+                    </td>
+                    <td><span class="badge bg-secondary">{{ c.category[:10] }}</span></td>
+                    <td>{{ c.location[:12] }}</td>
+                    
+                    <td>
+                        {% if c.assigned_to %}
+                            {% set matched_assignee = none %}
+                            {% for u in all_users %}
+                                {% if u.id|string == c.assigned_to|string %}
+                                    {% set matched_assignee = u %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if matched_assignee %}
+                                <span class="badge bg-success">{{ matched_assignee.name[:10] }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        {% if c.resolved_by %}
+                            {% set matched_resolver = none %}
+                            {% for u in all_users %}
+                                {% if u.id|string == c.resolved_by|string %}
+                                    {% set matched_resolver = u %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if matched_resolver %}
+                                <span class="badge bg-info">{{ matched_resolver.name[:10] }}</span>
+                            {% else %}
+                                <span class="text-muted">System Logged</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '-' }}</td>
+                    
+                    <td>
+                        {% if c.assigned_at %}
+                            <span class="badge bg-info">{{ c.assigned_at.strftime('%Y-%m-%d') }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        {% if c.created_at and c.assigned_at %}
+                            {% set diff = c.assigned_at - c.created_at %}
+                            {% set hours = (diff.total_seconds() / 3600)|int %}
+                            {% if hours < 1 %}
+                                <span class="badge bg-warning text-dark">{{ (diff.total_seconds() / 60)|int }}m</span>
+                            {% elif hours < 24 %}
+                                <span class="badge bg-primary">{{ hours }}h</span>
+                            {% else %}
+                                <span class="badge bg-success">{{ (hours / 24)|int }}d</span>
+                            {% endif %}
+                        {% elif c.created_at %}
+                            {% set diff = current_time - c.created_at %}
+                            {% set hours = (diff.total_seconds() / 3600)|int %}
+                            {% if hours < 1 %}
+                                <span class="badge bg-warning text-dark">{{ (diff.total_seconds() / 60)|int }}m</span>
+                            {% elif hours < 24 %}
+                                <span class="badge bg-primary">{{ hours }}h</span>
+                            {% else %}
+                                <span class="badge bg-danger">{{ (hours / 24)|int }}d</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td class="text-break small" title="{{ c.description }}">
+                        {% if c.description %}
+                            {{ c.description[:50] }}{% if c.description|length > 50 %}...{% endif %}
+                        {% else %}
+                            <span class="text-muted">No description provided</span>
+                        {% endif %}
+                    </td>
+                    
+                    <td>
+                        <form method="POST" action="{{ url_for('admin_update_status', comp_id=c.id) }}" class="d-flex gap-1">
+                            <select name="status" class="form-control form-control-sm bg-dark text-light" style="width: 75px;">
+                                <option value="Pending" {% if c.status == 'Pending' %}selected{% endif %}>Pending</option>
+                                <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Active</option>
+                                <option value="Closed" {% if c.status == 'Closed' %}selected{% endif %}>Closed</option>
+                            </select>
+                            <button type="submit" class="btn btn-sm btn-primary">
+                                <i class="fas fa-check"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <div id="noAdminResults" class="text-center py-3" style="display: none;">
+            <i class="fas fa-search text-muted" style="font-size: 2rem;"></i>
+            <p class="mt-2 text-muted">No matching complaints found.</p>
+        </div>
+    </div>
+</div>
         </div>
     </div>
 </div>
 
-<!-- JavaScript for Search Filter -->
+    
+</div>
+
 <script>
+// Cache base URL cleanly inside Javascript scope
+const baseReportUrl = "{{ url_for('generate_report', status=request.args.get('status', '')) }}";
+
 function filterAdmin() {
     var input = document.getElementById('adminSearch');
-    var filter = input.value.toLowerCase();
+    var filter = input.value.toLowerCase().trim();
     var table = document.getElementById('adminTable');
-    var rows = table.getElementsByTagName('tr');
+    if (!table) return;
+    
+    var rows = table.getElementsByClassName('admin-row');
     var visibleCount = 0;
     
-    for (var i = 1; i < rows.length; i++) {
+    for (var i = 0; i < rows.length; i++) {
         var row = rows[i];
         var text = row.textContent || row.innerText;
         
@@ -327,10 +350,19 @@ function filterAdmin() {
     }
     
     var noResults = document.getElementById('noAdminResults');
-    if (visibleCount === 0) {
-        noResults.style.display = "block";
-    } else {
-        noResults.style.display = "none";
+    if (noResults) {
+        noResults.style.display = (visibleCount === 0) ? "block" : "none";
+    }
+
+    // Dynamic URL parsing update loop for PDF reports
+    const reportBtn = document.getElementById('generateReportBtn');
+    if (reportBtn) {
+        if (filter !== '') {
+            const connector = baseReportUrl.includes('?') ? '&' : '?';
+            reportBtn.setAttribute('href', baseReportUrl + connector + 'search_filter=' + encodeURIComponent(filter));
+        } else {
+            reportBtn.setAttribute('href', baseReportUrl);
+        }
     }
 }
 </script>

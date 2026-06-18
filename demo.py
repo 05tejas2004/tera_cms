@@ -1,6 +1,6 @@
-from app import app, db, User
+users = User.query.filter_by(role='Operator').all()
 
-with app.app_context():
-    User.query.filter_by(role='FieldWorker').update({'role': 'FieldEngineer'})
-    db.session.commit()
-    print("Updated successfully!")
+for u in users:
+    u.role = 'TechnicalSupport'
+
+db.session.commit()

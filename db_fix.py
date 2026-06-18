@@ -1,9 +1,14 @@
-from app import app, db
+from app import app, db  # Import your Flask app instance and SQLAlchemy db object
 
-with app.app_context():
-    try:
-        db.session.execute(db.text('ALTER TABLE complaint ADD COLUMN created_by INTEGER'))
-        db.session.commit()
-        print("Column created_by added!")
-    except Exception as e:
-        print(f"Error: {e}")
+def reset_database():
+    with app.app_context():
+        print("⚠️ Warning: Dropping all database tables...")
+        db.drop_all()  # Permanently destroys all tables, columns, and data
+        
+        print("✅ Creating clean table schemas...")
+        db.create_all()  # Re-creates empty tables based on your SQLAlchemy models
+        
+        print("🚀 Database reset complete!")
+
+if __name__ == '__main__':
+    reset_database()

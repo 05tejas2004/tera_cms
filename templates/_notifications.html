@@ -1,0 +1,164 @@
+<div id="custom-toast-container" style="
+    position: fixed; 
+    top: 20px; 
+    right: 20px; 
+    z-index: 99999 !important; 
+    width: 350px; 
+    display: flex; 
+    flex-direction: column; 
+    gap: 12px;
+"></div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Establish the real-time background line using current window origin
+    const globalSocket = io.connect(window.location.origin, {
+        transports: ['websocket', 'polling']
+    });
+
+    // ==========================================
+    // MODULE A: POPUP VISUAL TOAST NOTIFICATIONS
+    // ==========================================
+    globalSocket.on('global_notification', function(data) {
+        const container = document.getElementById('custom-toast-container');
+        if (!container) return;
+
+        // Create a unique ID for this toast element
+        const toastId = 'toast-' + Date.now();
+
+        // Build a dark-themed Bootstrap styled floating card
+        const toastHtml = `
+            <div id="${toastId}" class="card border-warning shadow-lg" style="
+                background-color: #1a1d20; 
+                color: #fff; 
+                opacity: 0; 
+                transform: translateX(50px); 
+                transition: all 0.4s ease-in-out;
+            ">
+                <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center py-2">
+                    <strong class="me-auto"><i class="fas fa-bell animate-bounce"></i> ${data.title || 'System Alert'}</strong>
+                    <button type="button" class="btn-close btn-close-white small ms-2" onclick="closeToast('${toastId}')" style="font-size: 0.75rem;"></button>
+                </div>
+                <div class="card-body py-3 bg-dark text-light" style="border-bottom-left-radius: 4px; border-bottom-right-radius: 4px;">
+                    <p class="card-text mb-0 small" style="line-height: 1.4;">${data.message}</p>
+                </div>
+            </div>
+        `;
+
+        // Insert toast at the top of the container stack
+        container.insertAdjacentHTML('afterbegin', toastHtml);
+
+        // Animate the element sliding into view safely
+        const toastElement = document.getElementById(toastId);
+        setTimeout(() => {
+            if (toastElement) {
+                toastElement.style.opacity = '1';
+                toastElement.style.transform = 'translateX(0)';
+            }
+        }, 50);
+
+        // Play an elegant notification beep sound
+        // (Try WebAudio first; fallback to HTML5 audio to avoid AudioContext autoplay restrictions)
+        playNotificationBeep();
+        playNotificationFallbackAudio();
+
+        // Automatically dismiss the toast alert window after 8 seconds
+        setTimeout(() => {
+            closeToast(toastId);
+        }, 8000);
+    });
+
+    // ==========================================
+    // MODULE B: AUTOMATIC DASHBOARD DATA SYNC
+    // ==========================================
+    globalSocket.on('refresh_dashboards', function(syncData) {
+        console.log("Live Sync Event Triggered:", syncData);
+        
+        // Strategy A: Silent container wrapper refresh using Fetch API
+        const mainDataContainer = document.getElementById('live-dashboard-container');
+        
+        if (mainDataContainer) {
+            fetch(window.location.href)
+                .then(response => response.text())
+                .then(html => {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const freshContainer = doc.getElementById('live-dashboard-container');
+                    if (freshContainer) {
+                        mainDataContainer.innerHTML = freshContainer.innerHTML;
+                        console.log("Dashboard container content updated seamlessly in background.");
+                    }
+                })
+                .catch(err => console.error("Error updating dashboard wrapper components:", err));
+        } else {
+            // Strategy B: Fallback page-level hot reload if container wrapper isn't present
+            window.location.reload();
+        }
+    });
+});
+
+// Helper functions to handle closing toasts manually
+function closeToast(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(50px)';
+        setTimeout(() => { el.remove(); }, 400);
+    }
+}
+
+// Audio Engine Synthesis Core
+function playNotificationFallbackAudio() {
+    // HTML5 audio fallback (uses a user-visible <audio> element if present)
+    try {
+        const audioEl = document.getElementById('notificationSound');
+        if (audioEl) {
+            audioEl.currentTime = 0;
+            audioEl.play().catch(function () {});
+        }
+    } catch (e) {
+        // ignore
+    }
+}
+
+function playNotificationBeep() {
+    // May fail if browser blocks AudioContext until a user gesture exists
+
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const times = [0, 0.15];
+        
+        times.forEach((delay) => {
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(587.33, audioCtx.currentTime + delay); // D5 Note
+            
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime + delay);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + 0.12);
+            
+            osc.start(audioCtx.currentTime + delay);
+            osc.stop(audioCtx.currentTime + delay + 0.15);
+        });
+    } catch (e) {
+        console.warn("Audio Context audio-play was blocked or unsupported: ", e);
+    }
+}
+</script>
+
+<style>
+/* Subtle bell ring wiggle animation */
+@keyframes bounce {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(15deg); }
+    75% { transform: rotate(-15deg); }
+}
+.animate-bounce {
+    animation: bounce 0.5s ease infinite alternate;
+}
+</style>

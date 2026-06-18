@@ -8,11 +8,32 @@ import os
 from sqlalchemy import func
 import pandas as pd
 from werkzeug.utils import secure_filename
+from flask_login import current_user
 from flask_login import login_user
 from datetime import timedelta
 import uuid
 import json
 from flask import jsonify
+
+
+from flask import request, make_response, redirect, url_for
+from datetime import datetime
+from flask import Flask, render_template, request, make_response, redirect, url_for
+from flask_socketio import SocketIO, emit # <-- Add these imports
+from firebase_admin import messaging
+
+import json
+from flask import Flask, request, jsonify, render_template
+from pywebpush import webpush, WebPushException
+
+import io
+from flask import render_template_string, make_response, request, redirect, url_for
+from flask_login import login_required, current_user
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+from xhtml2pdf import pisa
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'tera-secret-key'
@@ -24,7 +45,67 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 
-# Add this temporarily to your app.py and run once
+
+# Replace your old socketio line with this one:
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    logger=True,          # Forces Flask to print WebSocket events to your terminal
+    engineio_logger=True, # Prints low-level packet transfers
+    ping_timeout=60, 
+    ping_interval=25
+)
+
+VAPID_PRIVATE_KEY = "YOUR_VAPID_PRIVATE_KEY_HERE"
+VAPID_CLAIMS = {
+    "sub": "mailto:admin@yourdomain.com"
+}
+
+def send_push_notification(token, title, body):
+    message = messaging.Message(
+        notification=messaging.Notification(
+            title=title,
+            body=body,
+        ),
+        token=token,
+    )
+    response = messaging.send(message)
+
+ALLOWED_EXTENSIONS = {'xlsx', 'xls', 'csv'}
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_filtered_complaints_dataset():
+    status_filter = request.args.get('status', '').strip()
+    search_filter = request.args.get('search_filter', '').strip().lower()
+    
+    valid_statuses = ['Pending', 'Active', 'Closed']
+    if status_filter in valid_statuses:
+        query = Complaint.query.filter(Complaint.status == status_filter)
+    else:
+        query = Complaint.query.filter(Complaint.status.in_(valid_statuses))
+        
+    complaints = query.order_by(Complaint.created_at.desc()).all()
+    all_users = User.query.all()
+    user_dict = {u.id: u for u in all_users}
+    
+    if search_filter:
+        filtered = []
+        for c in complaints:
+            short_id = (str(c.complaint_id)[-7:] if c.complaint_id else '').lower()
+            title = (str(c.title) if c.title else '').lower()
+            category = (str(c.category) if c.category else '').lower()
+            location = (str(c.location) if c.location else '').lower()
+            status = (str(c.status) if c.status else '').lower()
+            
+            if (search_filter in short_id or search_filter in title or 
+                search_filter in category or search_filter in location or search_filter in status):
+                filtered.append(c)
+        complaints = filtered
+        
+    return complaints, user_dict
 
 
 # --- Models ---
@@ -51,6 +132,7 @@ class Complaint(db.Model):
     accepted_at = db.Column(db.DateTime, nullable=True)  # Add THIS line
     assigned_at = db.Column(db.DateTime, nullable=True)
     resolved_at = db.Column(db.DateTime, nullable=True)
+    resolved_by = db.Column(db.Integer, db.ForeignKey('user.id'))
     resolution_remarks = db.Column(db.Text, nullable=True)
     worker_location = db.Column(db.String(100), nullable=True)
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'))
@@ -68,6 +150,15 @@ class Notification(db.Model):
     message = db.Column(db.Text)
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.now)
+    
+class ComplaintLog(db.Model):
+    __tablename__ = 'complaint_logs'
+    id = db.Column(db.Integer, primary_key=True)
+    complaint_id = db.Column(db.Integer, db.ForeignKey('complaint.id'), nullable=False)
+    status = db.Column(db.String(50), nullable=False)
+    changed_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
+    reason = db.Column(db.Text, nullable=True)
+    changed_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -87,7 +178,47 @@ def get_resolution_time(created_at, resolved_at):
 
 # --- Routes ---
 # Add this somewhere in your app (like after db.create_all())
+@app.route('/api/save-subscription', methods=['POST'])
+def save_subscription():
+    subscription_payload = request.get_json()
+    
+    if not subscription_payload:
+        return jsonify({"error": "Malformed subscription validation context"}), 400
+        
+    # Assume global session identifier context tracks current operator instances
+    current_user_id = "user_123" 
+    USER_SUBSCRIPTION_DB[current_user_id] = subscription_payload
+    
+    return jsonify({"status": "success", "message": "Device token written successfully."}), 200
 
+def dispatch_push_alert(user_id, alert_title, alert_body, target_url):
+    """ Internal microservice routine used to push standard payloads over WebPush protocol """
+    user_subscription_info = USER_SUBSCRIPTION_DB.get(user_id)
+    if not user_subscription_info:
+        return False
+        
+    payload_data = json.dumps({
+        "title": alert_title,
+        "body": alert_body,
+        "url": target_url,
+        "icon": "/static/images/notification-icon.png"
+    })
+    
+    try:
+        webpush(
+            subscription_info=user_subscription_info,
+            data=payload_data,
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_claims=VAPID_CLAIMS.copy()
+        )
+        return True
+    except WebPushException as ex:
+        print(f"Failed to dispatch remote push frames: {ex}")
+        # Clean up expired subscription tokens if the browser client has uninstalled or rejected permissions
+        if ex.response and ex.response.status_code in [404, 410]:
+            del USER_SUBSCRIPTION_DB[user_id]
+        return False
+    
 @app.route('/')
 def home():
     return redirect(url_for('login'))
@@ -161,7 +292,6 @@ def login():
         return redirect(url_for('login'))
     
     return render_template('login.html')
-
 @app.route('/auto_login', methods=['POST'])
 def auto_login():
     """Auto login using device token"""
@@ -176,14 +306,24 @@ def auto_login():
     
     return jsonify({'success': False}), 401
 
+
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    if current_user.role == 'Admin': return redirect(url_for('admin_dashboard'))
-    if current_user.role == 'Operator': return redirect(url_for('operator_dashboard'))
-    if current_user.role == 'HelpDesk': return redirect(url_for('helpdesk_dashboard'))
-    if current_user.role == 'FieldEngineer': return redirect(url_for('worker_dashboard'))
-    return "Role not defined"
+
+    if current_user.role == 'Admin':
+        return redirect(url_for('admin_dashboard'))
+
+    elif current_user.role == 'Operator':
+        return redirect(url_for('operator_dashboard'))
+
+    elif current_user.role == 'HelpDesk':
+        return redirect(url_for('helpdesk_dashboard'))
+
+    elif current_user.role == 'FieldEngineer':
+        return redirect(url_for('worker_dashboard'))
+
+    return f"Role not defined: {current_user.role}"
 
 @app.route('/logout')
 @login_required
@@ -192,7 +332,7 @@ def logout():
     return redirect(url_for('login'))
 
 # ============================================
-# ADMIN DASHBOARD
+# ADMIN DASHBOARD (UPDATED)
 # ============================================
 
 @app.route('/admin')
@@ -215,6 +355,10 @@ def admin_dashboard():
     active = len([c for c in complaints if c.status == 'Active'])
     closed = len([c for c in complaints if c.status == 'Closed'])
     
+    # --- MOVED OPERATOR STATS HERE ---
+    operators = User.query.filter_by(role='Operator', is_approved=True).count()
+    # ----------------------------------
+    
     # Pending users
     pending_users = User.query.filter_by(is_approved=False).all()
     
@@ -234,7 +378,11 @@ def admin_dashboard():
                           pending_users=pending_users,
                           complaints=complaints,
                           filtered_complaints=filtered_complaints,
+                          operators=operators, # <-- Passed to the Admin Dashboard template
                           current_time=datetime.now())
+
+
+
 # ============================================
 # ADMIN - USER MANAGEMENT
 # ============================================
@@ -330,152 +478,229 @@ def delete_user(user_id):
 def generate_report():
     if current_user.role != 'Admin':
         return redirect(url_for('dashboard'))
+        
+    # Detect the intended format type ('pdf' or 'excel')
+    report_format = request.args.get('format', 'excel').lower()
     
-    # Get complaints
-    complaints = Complaint.query.filter(
-        db.or_(
-            Complaint.status == 'Pending',
-            Complaint.status == 'Active',
-            Complaint.status == 'Closed'
+    # Run your exact filter engine
+    complaints, user_dict = get_filtered_complaints_dataset()
+    current_time = datetime.now()
+    
+    # Standardized Global Headings list containing all your specified targets
+    headers = [
+        "Complaint ID", "Title", "Description", "Category", "Location", 
+        "Created By", "Accepted By", "Resolved By", "Created", "Accepted", 
+        "Time", "Reason"
+    ]
+    
+    # --- BRANCH 1: EXCEL FORMAT ---
+    if report_format == 'excel':
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Complaints Export"
+        ws.views.sheetView[0].showGridLines = True
+        
+        SLATE_HEADER = "343A40"
+        ZEBRA_LIGHT = "F8F9FA"
+        
+        font_title = Font(name="Calibri", size=16, bold=True, color="212529")
+        font_sub = Font(name="Calibri", size=10, italic=True, color="6C757D")
+        font_h = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+        font_d = Font(name="Calibri", size=11, color="212529")
+        
+        fill_h = PatternFill(start_color=SLATE_HEADER, end_color=SLATE_HEADER, fill_type="solid")
+        fill_z = PatternFill(start_color=ZEBRA_LIGHT, end_color=ZEBRA_LIGHT, fill_type="solid")
+        border_thin = Border(
+            left=Side(style="thin", color="DEE2E6"), right=Side(style="thin", color="DEE2E6"),
+            top=Side(style="thin", color="DEE2E6"), bottom=Side(style="thin", color="DEE2E6")
         )
-    ).order_by(Complaint.created_at.desc()).all()
-    
-    # Get all users for role lookup
-    all_users = User.query.all()
-    user_dict = {u.id: u for u in all_users}
-    
-    # Create PDF
-    pdf = FPDF('P', 'mm', 'A4')
-    pdf.add_page()
-    pdf.set_auto_page_break(True, 10)
-    
-    # Title
-    pdf.set_font('Arial', 'B', 16)
-    pdf.cell(0, 10, 'Complaint Management System - Report', 0, 1, 'C')
-    
-    # Date
-    pdf.set_font('Arial', '', 10)
-    pdf.cell(0, 8, f'Generated: {datetime.now().strftime("%Y-%m-%d %H:%M")}', 0, 1, 'C')
-    pdf.ln(5)
-    
-    # Summary
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, 'Summary', 0, 1, 'L')
-    
-    pdf.set_font('Arial', '', 10)
-    total = len(complaints)
-    pending = len([c for c in complaints if c.status == 'Pending'])
-    active = len([c for c in complaints if c.status == 'Active'])
-    closed = len([c for c in complaints if c.status == 'Closed'])
-    
-    pdf.cell(50, 8, f'Total: {total}', 0, 0, 'L')
-    pdf.cell(50, 8, f'Pending: {pending}', 0, 0, 'L')
-    pdf.cell(50, 8, f'Active: {active}', 0, 0, 'L')
-    pdf.cell(50, 8, f'Closed: {closed}', 0, 1, 'L')
-    pdf.ln(5)
-    
-    # Table Header
-    pdf.set_font('Arial', 'B', 7)
-    pdf.set_fill_color(200, 200, 200)
-    
-    # Columns with Role (total ~195mm)
-    pdf.cell(18, 10, 'Complaint ID', 1, 0, 'C', 1)
-    pdf.cell(25, 10, 'Title', 1, 0, 'C', 1)
-    pdf.cell(20, 10, 'Category', 1, 0, 'C', 1)
-    pdf.cell(25, 10, 'Location', 1, 0, 'C', 1)
-    pdf.cell(15, 10, 'Status', 1, 0, 'C', 1)
-    pdf.cell(22, 10, 'Resolved By', 1, 0, 'C', 1)
-    pdf.cell(18, 10, 'Role', 1, 0, 'C', 1)
-    pdf.cell(20, 10, 'Created', 1, 0, 'C', 1)
-    pdf.cell(20, 10, 'Accepted', 1, 0, 'C', 1)
-    pdf.cell(12, 10, 'Time', 1, 1, 'C', 1)
-    
-    # Table Data
-    pdf.set_font('Arial', '', 6)
-    
-    for i, comp in enumerate(complaints):
-        # Alternate row colors
-        if i % 2 == 0:
-            pdf.set_fill_color(245, 245, 245)
-        else:
-            pdf.set_fill_color(255, 255, 255)
         
-        # Complaint ID
-        pdf.cell(18, 7, str(comp.complaint_id)[:10], 1, 0, 'C', 1)
+        ws["A1"] = "Complaint Management System - Dashboard Export"
+        ws["A1"].font = font_title
+        ws["A2"] = f"Generated: {current_time.strftime('%Y-%m-%d %H:%M')} | Data Snapshot"
+        ws["A2"].font = font_sub
         
-        # Title
-        pdf.cell(25, 7, str(comp.title)[:14], 1, 0, 'L', 1)
-        
-        # Category
-        pdf.cell(20, 7, str(comp.category)[:12], 1, 0, 'L', 1)
-        
-        # Location
-        pdf.cell(25, 7, str(comp.location)[:14], 1, 0, 'L', 1)
-        
-        # Status
-        pdf.cell(15, 7, comp.status, 1, 0, 'C', 1)
-        
-        # Resolved By
-        resolved_name = '-'
-        resolved_role = '-'
-        if comp.assigned_to and comp.assigned_to in user_dict:
-            resolved_name = user_dict[comp.assigned_to].name[:12]
-            resolved_role = user_dict[comp.assigned_to].role[:10]
-        
-        pdf.cell(22, 7, resolved_name, 1, 0, 'L', 1)
-        pdf.cell(18, 7, resolved_role, 1, 0, 'L', 1)
-        
-        # Created
-        created = comp.created_at.strftime('%Y-%m-%d') if comp.created_at else '-'
-        pdf.cell(20, 7, created, 1, 0, 'C', 1)
-        
-        # Accepted
-        accepted = comp.assigned_at.strftime('%Y-%m-%d') if comp.assigned_at else '-'
-        pdf.cell(20, 7, accepted, 1, 0, 'C', 1)
-        
-        # Time Difference
-        if comp.created_at and comp.assigned_at:
-            diff = comp.assigned_at - comp.created_at
-            hours = diff.total_seconds() / 3600
-            if hours < 1:
-                time_diff = f"{int(diff.total_seconds() // 60)}m"
-            elif hours < 24:
-                time_diff = f"{int(hours)}h"
-            else:
-                time_diff = f"{int(hours // 24)}d"
-        elif comp.created_at:
-            diff = datetime.now() - comp.created_at
-            hours = diff.total_seconds() / 3600
-            if hours < 1:
-                time_diff = f"{int(diff.total_seconds() // 60)}m"
-            elif hours < 24:
-                time_diff = f"{int(hours)}h"
-            else:
-                time_diff = f"{int(hours // 24)}d"
-        else:
-            time_diff = '-'
-        
-        pdf.cell(12, 7, time_diff, 1, 1, 'C', 1)
-    
-    # Footer
-    pdf.ln(10)
-    pdf.set_font('Arial', 'I', 8)
-    pdf.cell(0, 5, 'Page 1/1', 0, 0, 'R')
-    
-    # Return PDF
-    from flask import make_response
-    response = make_response(pdf.output(dest='S').encode('latin-1'))
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = 'attachment; filename=complaint_report.pdf'
-    return response
-# ============================================
-# ADMIN - STATISTICS
-# ============================================
-ALLOWED_EXTENSIONS = {'xlsx', 'xls'}
+        # Draw Headers Dynamically
+        for col_idx, text in enumerate(headers, 1):
+            cell = ws.cell(row=4, column=col_idx, value=text)
+            cell.font = font_h
+            cell.fill = fill_h
+            cell.border = border_thin
+            cell.alignment = Alignment(horizontal="center" if col_idx in [1, 9, 10, 11] else "left", vertical="center")
+            
+        for idx, c in enumerate(complaints, start=5):
+            # Safe mapping lookup tracking attributes
+            created_by_user = user_dict.get(c.created_by).name if (c.created_by and c.created_by in user_dict) else "-"
+            accepted_by_user = user_dict.get(c.assigned_to).name if (c.assigned_to and c.assigned_to in user_dict) else "-"
+            resolved_by_user = user_dict.get(c.resolved_by).name if (c.resolved_by and c.resolved_by in user_dict) else "-"
+            
+            created = c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-'
+            accepted = c.assigned_at.strftime('%Y-%m-%d %H:%M') if c.assigned_at else '-'
+            
+            time_diff = "-"
+            if c.created_at:
+                ref_time = c.assigned_at if c.assigned_at else current_time
+                diff_sec = (ref_time - c.created_at).total_seconds()
+                hours = int(diff_sec // 3600)
+                time_diff = f"{int(diff_sec // 60)}m" if hours < 1 else (f"{hours}h" if hours < 24 else f"{int(hours // 24)}d")
+                
+            desc = c.description or "-"
+            reason = c.resolution_remarks or "-"
+            
+            # Map values precisely to standard header indices
+            row_data = [
+                str(c.complaint_id), str(c.title), desc, str(c.category), str(c.location),
+                created_by_user, accepted_by_user, resolved_by_user, created, accepted, 
+                time_diff, reason
+            ]
+            
+            for col_idx, val in enumerate(row_data, 1):
+                cell = ws.cell(row=idx, column=col_idx, value=val)
+                cell.font = font_d
+                cell.border = border_thin
+                if idx % 2 == 0:
+                    cell.fill = fill_z
+                cell.alignment = Alignment(horizontal="center" if col_idx in [1, 9, 10, 11] else "left", vertical="center")
+                
+        for col in ws.columns:
+            max_len = max(len(str(cell.value or '')) for cell in col)
+            col_letter = get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = min(max(max_len + 3, 11), 35)
 
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+        stream = io.BytesIO()
+        wb.save(stream)
+        stream.seek(0)
+        
+        response = make_response(stream.getvalue())
+        response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        response.headers['Content-Disposition'] = 'attachment; filename=complaints_dataset_export.xlsx'
+        return response
 
+    # --- BRANCH 2: PDF FORMAT ---
+    elif report_format == 'pdf':
+        html_template = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+        <style>
+            @page { size: A4 landscape; margin: 8mm; background-color: #ffffff; }
+            body { font-family: Arial, sans-serif; color: #212529; font-size: 7.5pt; margin: 0; }
+            .header { border-bottom: 2px solid #343a40; padding-bottom: 5px; margin-bottom: 12px; }
+            h2 { margin: 0 0 4px 0; color: #343a40; font-size: 14pt; }
+            .meta { color: #6c757d; font-size: 8pt; margin: 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 5px; table-layout: fixed; }
+            th { background-color: #343a40; color: white; font-weight: bold; border: 1px solid #dee2e6; padding: 5px; font-size: 7.5pt; text-align: left; }
+            td { border: 1px solid #dee2e6; padding: 5px; font-size: 7pt; vertical-align: top; word-wrap: break-word; overflow: hidden; }
+            tr:nth-child(even) td { background-color: #f8f9fa; }
+            .center { text-align: center; }
+            .badge { display: inline-block; padding: 1px 4px; font-size: 7pt; border-radius: 2px; color: white; background-color: #6c757d; }
+            .bg-success { background-color: #198754; }
+            .bg-info { background-color: #0dcaf0; color: #000; }
+            .bg-warning { background-color: #ffc107; color: #000; }
+        </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>Complaint Management System - Report Archive</h2>
+                <p class="meta">Generated: {{ current_time.strftime('%Y-%m-%d %H:%M') }}</p>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 8%;">Complaint ID</th>
+                        <th style="width: 10%;">Title</th>
+                        <th style="width: 14%;">Description</th>
+                        <th style="width: 8%;">Category</th>
+                        <th style="width: 8%;">Location</th>
+                        <th style="width: 8%;">Created By</th>
+                        <th style="width: 8%;">Accepted By</th>
+                        <th style="width: 8%;">Resolved By</th>
+                        <th style="width: 8%;">Created</th>
+                        <th style="width: 8%;">Accepted</th>
+                        <th style="width: 4%;">Time</th>
+                        <th style="width: 8%;">Reason</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in complaints %}
+                    <tr>
+                        <td class="center"><strong>{{ c.complaint_id }}</strong></td>
+                        <td>{{ c.title }}</td>
+                        <td>{{ c.description or '-' }}</td>
+                        <td><span class="badge">{{ c.category }}</span></td>
+                        <td>{{ c.location }}</td>
+                        
+                        <td>
+                            {% if c.created_by and c.created_by in user_dict %}
+                                {{ user_dict[c.created_by].name }}
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if c.assigned_to and c.assigned_to in user_dict %}
+                                <span class="badge bg-success">{{ user_dict[c.assigned_to].name }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if c.resolved_by and c.resolved_by in user_dict %}
+                                <span class="badge bg-info">{{ user_dict[c.resolved_by].name }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="center">{{ c.created_at.strftime('%Y-%m-%d') if c.created_at else '-' }}</td>
+                        <td class="center">{{ c.assigned_at.strftime('%Y-%m-%d') if c.assigned_at else '-' }}</td>
+                        
+                        <td class="center">
+                            {% if c.created_at %}
+                                {% set r_time = c.assigned_at if c.assigned_at else current_time %}
+                                {% set diff = r_time - c.created_at %}
+                                {% set hours = (diff.total_seconds() / 3600)|int %}
+                                {% if hours < 1 %}
+                                    <span class="badge bg-warning">{{ (diff.total_seconds() / 60)|int }}m</span>
+                                {% elif hours < 24 %}
+                                    <span class="badge bg-success">{{ hours }}h</span>
+                                {% else %}
+                                    <span class="badge bg-success">{{ (hours / 24)|int }}d</span>
+                                {% endif %}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            {% if c.resolution_remarks %}
+                                {{ c.resolution_remarks.split(':')[-1].strip() if ':' in c.resolution_remarks else c.resolution_remarks }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </body>
+        </html>
+        """
+        rendered_html = render_template_string(html_template, complaints=complaints, user_dict=user_dict, current_time=current_time)
+        pdf_stream = io.BytesIO()
+        
+        pisa_status = pisa.CreatePDF(io.StringIO(rendered_html), dest=pdf_stream)
+        
+        if pisa_status.err:
+            return "Error generating PDF", 500
+            
+        pdf_stream.seek(0)
+        response = make_response(pdf_stream.getvalue())
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = 'attachment; filename=complaints_matrix_report.pdf'
+        return response
 
 # ============================================
 # THEN, ADD THE ROUTE AFTER ALL OTHER ROUTES
@@ -579,7 +804,7 @@ def admin_statistics():
     approved_users = User.query.filter_by(is_approved=True).count()
     pending_users = User.query.filter_by(is_approved=False).count()
     engineers = User.query.filter_by(role='FieldEngineer', is_approved=True).count()
-    operators = User.query.filter_by(role='Operator', is_approved=True).count()
+    # REMOVED: operators query stripped from here
     helpdesk = User.query.filter_by(role='HelpDesk', is_approved=True).count()
     admins = User.query.filter_by(role='Admin', is_approved=True).count()
     
@@ -653,24 +878,24 @@ def admin_statistics():
         })
     
     return render_template('admin_statistics.html',
-                         total_users=total_users,
-                         approved_users=approved_users,
-                         pending_users=pending_users,
-                         engineers=engineers,
-                         operators=operators,
-                         helpdesk=helpdesk,
-                         admins=admins,
-                         total_complaints=total_complaints,
-                         pending=pending,
-                         active=active,
-                         resolved=resolved,
-                         closed=closed,
-                         rejected=rejected,
-                         category_counts=category_counts,
-                         high_priority=high_priority,
-                         medium_priority=medium_priority,
-                         low_priority=low_priority,
-                         engineer_performance=engineer_list)
+                           total_users=total_users,
+                           approved_users=approved_users,
+                           pending_users=pending_users,
+                           engineers=engineers,
+                           # REMOVED: operators mapping omitted
+                           helpdesk=helpdesk,
+                           admins=admins,
+                           total_complaints=total_complaints,
+                           pending=pending,
+                           active=active,
+                           resolved=resolved,
+                           closed=closed,
+                           rejected=rejected,
+                           category_counts=category_counts,
+                           high_priority=high_priority,
+                           medium_priority=medium_priority,
+                           low_priority=low_priority,
+                           engineer_performance=engineer_list)
 
 # ============================================
 # ADMIN - UPDATE COMPLAINT STATUS
@@ -697,6 +922,17 @@ def admin_update_status(comp_id):
             complaint.resolved_at = datetime.now()
         
         db.session.commit()
+
+        # --- REAL-TIME BROADCAST TRIGGER FOR ADMIN ---
+        try:
+            socketio.emit('global_notification', {
+                'title': '売 Status Updated by Admin',
+                'message': f"Complaint ID ...{str(complaint.complaint_id)[-7:]} has been changed from '{old_status}' to '{new_status}' by System Admin."
+            }, broadcast=True)
+        except Exception as e:
+            print(f"WebSocket Admin broadcast error: {e}")
+        # -----------------------------------------------
+
         flash(f'Complaint {complaint.complaint_id} status updated from {old_status} to {new_status}!', 'success')
     
     return redirect(url_for('admin_dashboard'))
@@ -759,6 +995,26 @@ def admin_view_complaint(comp_id):
                          complaint=complaint,
                          all_users=all_users,
                          images=images)
+
+@app.route('/complaint/view/<int:id>')
+@login_required
+def view_single_complaint(id):
+    complaint = Complaint.query.get_or_404(id)
+    creator = User.query.get(complaint.created_by) if complaint.created_by else None
+    resolver = User.query.get(complaint.resolved_by) if complaint.resolved_by else None
+    
+    # CRITICAL: Fetch logs from oldest to newest to trace the history cleanly
+    logs = ComplaintLog.query.filter_by(complaint_id=complaint.id).order_by(ComplaintLog.changed_at.asc()).all()
+    
+    # Create a quick directory map to resolve usernames dynamically inside the log table
+    all_users = {u.id: u.name for u in User.query.all()}
+    
+    return render_template('complaint_view.html', 
+                           complaint=complaint, 
+                           creator=creator, 
+                           resolver=resolver,
+                           logs=logs,
+                           all_users=all_users)
 # ============================================
 # OPERATOR DASHBOARD
 # ============================================
@@ -766,24 +1022,94 @@ def admin_view_complaint(comp_id):
 @app.route('/operator')
 @login_required
 def operator_dashboard():
-    if current_user.role != 'Operator': return redirect(url_for('dashboard'))
+    # Role-based validation gate check
+    if current_user.role != 'Operator': 
+        return redirect(url_for('dashboard'))
     
-    complaints = Complaint.query.all()
+    # Base Collections
+    complaints = Complaint.query.order_by(Complaint.created_at.desc()).all()
     resolved_complaints = Complaint.query.filter_by(status='Resolved').all()
-    all_users = User.query.all()  # Add this - get all users
+    all_users = User.query.all()
     
+    # ----------------------------------------------------
+    # NEW KPI METRICS QUERIES
+    # ----------------------------------------------------
+    total_count = Complaint.query.count()
+    active_count = Complaint.query.filter_by(status='Active').count()
+    resolved_count = Complaint.query.filter_by(status='Resolved').count()
+    closed_count = Complaint.query.filter_by(status='Closed').count()
+    # ----------------------------------------------------
+    
+    # Fetch image dictionary mappings safely
     complaint_images = {}
-    for c in resolved_complaints:
+    for c in complaints:
         images = ComplaintImage.query.filter_by(complaint_id=c.id).all()
         complaint_images[c.id] = images
     
     return render_template('operator_dashboard.html', 
-                         complaints=complaints,
-                         resolved_complaints=resolved_complaints,
-                         all_users=all_users,
-                         complaint_images=complaint_images,
-                         get_resolution_time=get_resolution_time)
+                           complaints=complaints,
+                           resolved_complaints=resolved_complaints,
+                           all_users=all_users,
+                           complaint_images=complaint_images,
+                           get_resolution_time=get_resolution_time,
+                           # Pass metrics keys context down to view template layer
+                           total_count=total_count,
+                           active_count=active_count,
+                           resolved_count=resolved_count,
+                           closed_count=closed_count)
 
+@app.route('/operator/stats')
+@login_required
+def operator_stats():
+    # Role gate check
+    if current_user.role != 'Operator':
+        return redirect(url_for('dashboard'))
+
+    # 1. Broad High-Level Statistics Counters
+    total_complaints = Complaint.query.count()
+    pending_count = Complaint.query.filter_by(status='Pending').count()
+    active_count = Complaint.query.filter_by(status='Active').count()
+    resolved_count = Complaint.query.filter_by(status='Resolved').count()
+    closed_count = Complaint.query.filter_by(status='Closed').count()
+
+    # 2. Category Breakdowns
+    category_data = db.session.query(
+        Complaint.category, func.count(Complaint.id)
+    ).group_by(Complaint.category).all()
+    
+    categories = [row[0] for row in category_data if row[0]]
+    category_counts = [row[1] for row in category_data if row[0]]
+
+    # 3. Priority Breakdowns
+    priority_data = db.session.query(
+        Complaint.priority, func.count(Complaint.id)
+    ).group_by(Complaint.priority).all()
+    
+    priorities = [row[0] for row in priority_data if row[0]]
+    priority_counts = [row[1] for row in priority_data if row[0]]
+
+    # 4. Location-based Frequency Breakdowns (Top 5 locations)
+    location_data = db.session.query(
+        Complaint.location, func.count(Complaint.id)
+    ).group_by(Complaint.location).order_by(func.count(Complaint.id).desc()).limit(5).all()
+    
+    locations = [row[0] for row in location_data if row[0]]
+    location_counts = [row[1] for row in location_data if row[0]]
+
+    return render_template(
+        'operator_stats.html',
+        total=total_complaints,
+        pending=pending_count,
+        active=active_count,
+        resolved=resolved_count,
+        closed=closed_count,
+        categories=categories,
+        category_counts=category_counts,
+        priorities=priorities,
+        priority_counts=priority_counts,
+        locations=locations,
+        location_counts=location_counts
+    )
 # ============================================
 # OPERATOR - VERIFY COMPLAINT (Separate Page)
 # ============================================
@@ -814,6 +1140,45 @@ def verify_complaint(comp_id):
                          all_users=all_users,
                          get_resolution_time=get_resolution_time)
 
+@app.route('/operator/update/<int:comp_id>', methods=['POST'])
+@login_required
+def tech_support_update_complaint(comp_id):
+    # Ensure authorization
+    if current_user.role not in ['TechnicalSupport', 'Operator']:
+        return redirect(url_for('dashboard'))
+        
+    comp = Complaint.query.get_or_404(comp_id)
+    old_status = comp.status
+    new_status = request.form.get('status')
+    user_reason = request.form.get('reason')
+    
+    # Track who updated this complaint
+    comp.assigned_to = current_user.id  # Links the "Resolved By" lookup
+    comp.status = new_status
+    
+    if new_status == 'Closed':
+        comp.closed_at = datetime.now()
+    elif new_status == 'Active':
+        comp.assigned_at = datetime.now() 
+    
+    # Save the structured log string format
+    timestamp = datetime.now().strftime('%d-%m-%Y %H:%M')
+    comp.resolution_remarks = f"[{timestamp}] {current_user.name} changed status to {new_status}: {user_reason}"
+    
+    db.session.commit()
+
+    # --- REAL-TIME BROADCAST TRIGGER FOR OPERATORS ---
+    try:
+        socketio.emit('global_notification', {
+            'title': '売 Status Updated by Operator',
+            'message': f"Complaint ID ...{str(comp.complaint_id)[-7:]} has been changed from '{old_status}' to '{new_status}' by {current_user.name}."
+        }, broadcast=True)
+    except Exception as e:
+        print(f"WebSocket Operator broadcast error: {e}")
+    # --------------------------------------------------
+    
+    flash(f'Complaint status updated to {new_status} successfully.', 'success')
+    return redirect(url_for('operator_dashboard'))
 # ============================================
 # OPERATOR - PHOTO VIEWER (Full Screen)
 # ============================================
@@ -846,23 +1211,32 @@ def photo_viewer(comp_id):
 @app.route('/helpdesk')
 @login_required
 def helpdesk_dashboard():
-    if current_user.role != 'HelpDesk': return redirect(url_for('dashboard'))
+    if current_user.role != 'HelpDesk': 
+        return redirect(url_for('dashboard'))
     
-    complaints = Complaint.query.all()
+    # 1. Base Query sorted from latest to oldest (Newest on top)
+    complaints = Complaint.query.order_by(Complaint.created_at.desc()).all()
+    
+    # Fetch engineers for any dropdown assignment logic
     engineers = User.query.filter_by(role='FieldEngineer', is_approved=True).all()
     
-    # Get filter status from URL
+    # Fetch all users so the template can match names to IDs seamlessly
+    all_users = User.query.all()
+    
+    # Get filter status parameter from URL string
     filter_status = request.args.get('status')
     
+    # 2. Extract filtered list while preserving the database desc() sorting order
     if filter_status:
         filtered_complaints = [c for c in complaints if c.status == filter_status]
     else:
         filtered_complaints = complaints
     
     return render_template('helpdesk_dashboard.html', 
-                         complaints=complaints, 
-                         engineers=engineers,
-                         filtered_complaints=filtered_complaints)
+                           complaints=complaints, 
+                           engineers=engineers,
+                           filtered_complaints=filtered_complaints,
+                           all_users=all_users)
 # ============================================
 # FIELD ENGINEER DASHBOARD
 # ============================================
@@ -898,123 +1272,7 @@ def worker_dashboard():
                          my_history=my_history,
                          engineers=engineers)
 
-# ============================================
-# WORKER - GENERATE REPORT
-# ============================================
 
-@app.route('/worker/report')
-@login_required
-def worker_generate_report():
-    if current_user.role != 'FieldEngineer': 
-        return redirect(url_for('dashboard'))
-    
-    # Get only this worker's complaints
-    complaints = Complaint.query.filter_by(assigned_to=current_user.id).order_by(Complaint.created_at.desc()).all()
-    
-    class PDF(FPDF):
-        def header(self):
-            self.set_font('Arial', 'B', 16)
-            self.cell(0, 10, 'Field Engineer - Complaint Report', 0, 1, 'C')
-            self.set_font('Arial', 'I', 10)
-            self.cell(0, 8, f'Engineer: {current_user.name}', 0, 1, 'C')
-            self.ln(3)
-        
-        def footer(self):
-            self.set_y(-15)
-            self.set_font('Arial', 'I', 8)
-            self.cell(0, 10, f'Generated on: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', 0, 0, 'C')
-    
-    pdf = PDF(orientation='L', unit='mm', format='A4')
-    pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
-    
-    # Column widths
-    col_widths = [30, 50, 30, 40, 25, 32, 32, 25]
-    headers = ['ID', 'Title', 'Category', 'Location', 'Status', 'Accepted', 'Resolved', 'Time Taken']
-    
-    # Table Header
-    pdf.set_font('Arial', 'B', 9)
-    pdf.set_fill_color(40, 44, 52)
-    pdf.set_text_color(255, 255, 255)
-    
-    for i, header in enumerate(headers):
-        pdf.cell(col_widths[i], 8, header, 1, 0, 'C', True)
-    pdf.ln()
-    
-    # Table Data
-    pdf.set_font('Arial', '', 8)
-    pdf.set_text_color(0, 0, 0)
-    
-    for idx, c in enumerate(complaints):
-        if idx % 2 == 0:
-            pdf.set_fill_color(240, 240, 240)
-        else:
-            pdf.set_fill_color(255, 255, 255)
-        
-        # Time taken
-        time_taken = "-"
-        if c.resolved_at and c.created_at:
-            diff = c.resolved_at - c.created_at
-            total_minutes = int(diff.total_seconds() / 60)
-            if total_minutes < 60:
-                time_taken = f"{total_minutes} min"
-            elif total_minutes < 1440:
-                hours = total_minutes // 60
-                time_taken = f"{hours} hr" if hours == 1 else f"{hours} hrs"
-            else:
-                days = total_minutes // 1440
-                time_taken = f"{days} day" if days == 1 else f"{days} days"
-        elif c.status == 'Active':
-            time_taken = "In Progress"
-        
-        accepted_date = c.assigned_at.strftime('%Y-%m-%d %H:%M') if c.assigned_at else '-'
-        resolved_date = c.resolved_at.strftime('%Y-%m-%d %H:%M') if c.resolved_at else '-'
-        
-        pdf.cell(col_widths[0], 7, str(c.complaint_id), 1, 0, 'L', True)
-        pdf.cell(col_widths[1], 7, str(c.title)[:22], 1, 0, 'L', True)
-        pdf.cell(col_widths[2], 7, str(c.category)[:12], 1, 0, 'L', True)
-        pdf.cell(col_widths[3], 7, str(c.location)[:18], 1, 0, 'L', True)
-        pdf.cell(col_widths[4], 7, str(c.status), 1, 0, 'C', True)
-        pdf.cell(col_widths[5], 7, accepted_date[:14], 1, 0, 'C', True)
-        pdf.cell(col_widths[6], 7, resolved_date[:14], 1, 0, 'C', True)
-        pdf.cell(col_widths[7], 7, time_taken, 1, 1, 'C', True)
-    
-    pdf.ln(10)
-    
-    # Summary
-    pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, 'MY SUMMARY', 0, 1, 'L')
-    pdf.ln(3)
-    
-    pdf.set_font('Arial', '', 10)
-    total = len(complaints)
-    active = len([c for c in complaints if c.status == 'Active'])
-    resolved = len([c for c in complaints if c.status == 'Resolved'])
-    closed = len([c for c in complaints if c.status == 'Closed'])
-    rejected = len([c for c in complaints if c.status == 'Rejected'])
-    
-    summary_data = [
-        ('Total Complaints', str(total)),
-        ('Active', str(active)),
-        ('Resolved (Waiting)', str(resolved)),
-        ('Closed (Approved)', str(closed)),
-        ('Rejected', str(rejected))
-    ]
-    
-    pdf.set_fill_color(220, 220, 220)
-    for label, value in summary_data:
-        pdf.cell(50, 8, label, 1, 0, 'L', True)
-        pdf.cell(30, 8, value, 1, 1, 'C', True)
-    
-    # Output PDF
-    from flask import make_response
-    pdf_output = pdf.output(dest='S').encode('latin-1')
-    
-    response = make_response(pdf_output)
-    response.headers['Content-Type'] = 'application/pdf'
-    response.headers['Content-Disposition'] = f'attachment; filename=my_report_{datetime.now().strftime("%Y%m%d_%H%M%S")}.pdf'
-    
-    return response
 # ============================================
 # NOTIFICATIONS
 # ============================================
@@ -1038,9 +1296,7 @@ def mark_notif_read(notif_id):
 # REGISTER COMPLAINT
 # ============================================
 
-# ============================================
-# REGISTER COMPLAINT
-# ============================================
+
 
 @app.route('/register_complaint', methods=['GET', 'POST'])
 @login_required
@@ -1049,20 +1305,31 @@ def register_complaint():
         return redirect(url_for('dashboard'))
     
     if request.method == 'POST':
+        categories = request.form.getlist('category[]')
         new_comp = Complaint(
             complaint_id=f"CMP-{datetime.now().strftime('%Y%m%d%H%M%S')}",
             title=request.form['title'],
             description=request.form['description'],
-            category=request.form['category'],
+            category=", ".join(categories),
             priority=request.form['priority'],
             location=request.form['location'],
             created_by=current_user.id,
             status='Pending'
         )
+
         db.session.add(new_comp)
-        db.session.flush()
+        db.session.flush() # Generates the new_comp.id dynamically
         
-        # Notify ALL field engineers
+        # --- AUDIT TRAIL LOGGING: INITIAL COMPLAINT REGISTRATION ---
+        initial_log = ComplaintLog(
+            complaint_id=new_comp.id,
+            status='Pending',
+            changed_by=current_user.id,
+            reason="Complaint successfully registered in the ecosystem."
+        )
+        db.session.add(initial_log)
+        
+        # Notify ALL field engineers via database layout records
         engineers = User.query.filter_by(role='FieldEngineer', is_approved=True).all()
         for engineer in engineers:
             notif = Notification(
@@ -1073,14 +1340,29 @@ def register_complaint():
             )
             db.session.add(notif)
         
-        db.session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"Database commit exception: {e}")
+            flash('An error occurred while saving the complaint.', 'error')
+            return redirect(url_for('helpdesk_dashboard'))
+        
+        # --- GLOBAL SOCKET REAL-TIME BROADCAST WITH SOUND ---
+        try:
+            socketio.emit('global_notification', {
+                'title': '🔔 New Complaint Registered!',
+                'message': f"Complaint {new_comp.complaint_id[-7:]}: '{new_comp.title}' has been reported at {new_comp.location}."
+            }, broadcast=True)
+        except Exception as e:
+            print(f"WebSocket broadcast exception: {e}")
+        # ----------------------------------------------------
         
         if engineers:
             flash(f'Complaint registered! All {len(engineers)} engineers notified.')
         else:
             flash('Complaint registered! No engineers available.')
         
-        # Simple redirect - just go back to helpdesk dashboard
         if current_user.role == 'Operator':
             return redirect(url_for('operator_dashboard'))
         else:
@@ -1088,6 +1370,68 @@ def register_complaint():
     
     return render_template('register_complaint.html')
 
+
+@app.route('/update_complaint_status/<int:comp_id>', methods=['POST'])
+@login_required
+def update_complaint_status(comp_id):
+    if current_user.role not in ['Admin', 'HelpDesk', 'Operator', 'FieldEngineer']:
+        return redirect(url_for('dashboard'))
+        
+    complaint = Complaint.query.get_or_404(comp_id)
+    old_status = complaint.status
+    new_status = request.form.get('status')
+    
+    # Capture the context reasoning text field (Fallback check for 'remarks' or 'reason' forms)
+    remarks = request.form.get('remarks', request.form.get('reason', '')).strip()
+    
+    if new_status and (new_status != old_status or remarks):
+        complaint.status = new_status
+        complaint.resolved_by = current_user.id  # Dynamically logs who performed the status modification
+        
+        # Format closing text notes logs context
+        log_reason = remarks if remarks else f"Status manually adjusted to {new_status} by {current_user.role}."
+        complaint.resolution_remarks = f"{current_user.role}: {log_reason}"
+        
+        if new_status in ['Active', 'Closed']:
+            complaint.assigned_at = datetime.now()
+            
+        # --- AUDIT TRAIL LOGGING: TRACK SYSTEM STATUS CHANGE ---
+        new_log = ComplaintLog(
+            complaint_id=complaint.id,
+            status=new_status,
+            changed_by=current_user.id,
+            reason=log_reason
+        )
+        db.session.add(new_log)
+        
+        try:
+            db.session.commit()
+            flash(f"Complaint status updated to {new_status} successfully!")
+        except Exception as e:
+            db.session.rollback()
+            print(f"Database update exception: {e}")
+            flash('An error occurred while updating the complaint status.', 'error')
+        
+        # --- GLOBAL SOCKET REAL-TIME BROADCAST FOR STATUS CHANGES ---
+        try:
+            socketio.emit('global_notification', {
+                'title': '🔄 Complaint Status Changed',
+                'message': f"Complaint ID ...{str(complaint.complaint_id)[-7:]} has been changed from '{old_status}' to '{new_status}' by {current_user.role} ({current_user.name})."
+            }, broadcast=True)
+        except Exception as e:
+            print(f"WebSocket status broadcast exception: {e}")
+        # ------------------------------------------------------------
+        
+    # Redirect cleanly based on who updated it
+    if current_user.role == 'Operator':
+        return redirect(url_for('operator_dashboard'))
+    elif current_user.role == 'HelpDesk':
+        return redirect(url_for('helpdesk_dashboard'))
+    elif current_user.role == 'Admin':
+        return redirect(url_for('admin_dashboard'))
+    else:
+        return redirect(url_for('dashboard'))
+    
 # ============================================
 # FIELD ENGINEER - ACCEPT COMPLAINT
 # ============================================
@@ -1238,25 +1582,38 @@ def reject_close(comp_id):
 @login_required
 def helpdesk_update_complaint(comp_id):
     if current_user.role != 'HelpDesk':
+        flash('Unauthorized access.', 'error')
         return redirect(url_for('dashboard'))
-    
+
     complaint = Complaint.query.get_or_404(comp_id)
+    
     new_status = request.form.get('status')
+    reason_remarks = request.form.get('reason', '').strip()
     
-    # HelpDesk can change status to Closed for ANY complaint
-    if new_status == 'Closed':
-        complaint.status = new_status
-        complaint.closed_at = datetime.now()
-        complaint.resolved_by = current_user.id
-        complaint.assigned_to = current_user.id
-    elif new_status == 'Pending':
-        complaint.status = new_status
-    elif new_status == 'Active':
-        complaint.status = new_status
+    # Update core complaint properties
+    complaint.status = new_status
+    complaint.resolution_remarks = reason_remarks
+    complaint.resolved_by = current_user.id  # Sets the operator tracking key
     
-    db.session.commit()
-    flash(f'Complaint {complaint.complaint_id} updated to {new_status}!', 'success')
+    if new_status in ['Active', 'Closed']:
+        complaint.assigned_at = datetime.now()
+
+    # --- AUDIT TRAIL LOGGING ---
+    new_log = ComplaintLog(
+        complaint_id=complaint.id,
+        status=new_status,
+        changed_by=current_user.id,
+        reason=reason_remarks
+    )
+    db.session.add(new_log)
     
+    try:
+        db.session.commit()
+        flash('Complaint status updated and logged successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while updating the complaint.', 'error')
+        
     return redirect(url_for('helpdesk_dashboard'))
 
 
@@ -1293,8 +1650,8 @@ if __name__ == '__main__':
     with app.app_context():
         # ✅ Add missing column to existing database
         try:
-            db.session.execute(db.text('ALTER TABLE user ADD COLUMN device_token VARCHAR(100)'))
-            db.session.commit()
+            db.session.execute(text('ALTER TABLE "user" ADD COLUMN device_token VARCHAR(100);'))
+            db.session.commit()  # Make sure to explicitly commit this adjustment!
             print("Column added successfully!")
         except Exception as e:
             print(f"Column already exists or error: {e}")
@@ -1313,5 +1670,9 @@ if __name__ == '__main__':
             db.session.add(admin)
             db.session.commit()
 
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    # Create uploads folder
+    if not os.path.exists(app.config['UPLOAD_FOLDER']):
+        os.makedirs(app.config['UPLOAD_FOLDER'])
+    
+    socketio.run(app, debug=True, port=5000)
+

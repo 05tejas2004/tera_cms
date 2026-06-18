@@ -1,21 +1,24 @@
 {
-  "name": "TERA CMS",
-  "short_name": "TERA",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#1e293b",
-  "theme_color": "#0f172a",
-  "description": "TERA Complaint Management System",
+  "short_name": "TeraCMS",
+  "name": "Tera Complaint Management System",
+  "description": "Real-time Complaint Management System with instant notifications and offline synchronization.",
   "icons": [
     {
-      "src": "/static/Tera_Logo.png",
+      "src": "/static/tera_logo.png",
+      "type": "image/png",
       "sizes": "192x192",
-      "type": "image/png"
+      "purpose": "any maskable"
     },
     {
-      "src": "/static/Tera_Logo.png",
+      "src": "/static/tera_logo.png",
+      "type": "image/png",
       "sizes": "512x512",
-      "type": "image/png"
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "start_url": "/dashboard",
+  "background_color": "#1b365d",
+  "theme_color": "#343a40",
+  "display": "standalone",
+  "orientation": "portrait"
 }

@@ -3,7 +3,6 @@
 <div class="container mt-4">
     <h2><i class="fas fa-headset"></i> Help Desk Dashboard</h2>
     
-    <!-- Flash Messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -14,7 +13,6 @@
         {% endif %}
     {% endwith %}
     
-    <!-- Filter Status -->
     {% if request.args.get('status') %}
     <div class="alert alert-info d-flex justify-content-between align-items-center mt-3">
         <span>
@@ -27,13 +25,11 @@
     </div>
     {% endif %}
     
-    <!-- Info Alert -->
     <div class="alert alert-info mt-3">
         <i class="fas fa-info-circle"></i>
         <strong>Note:</strong> You can change status of any complaint.
     </div>
     
-    <!-- Stats Cards -->
     <div class="row mt-4">
         <div class="col-md-4">
             <a href="{{ url_for('helpdesk_dashboard') }}" class="text-decoration-none">
@@ -69,51 +65,78 @@
         </div>
     </div>
     
-    <!-- Register Button -->
     <div class="mt-4">
         <a href="{{ url_for('register_complaint') }}" class="btn btn-success py-3">
             <i class="fas fa-plus"></i> Register New Complaint
         </a>
     </div>
     
-    <!-- Complaints Table -->
     <div class="card mt-4 shadow">
-        <div class="card-header bg-info text-dark d-flex justify-content-between">
-            <h5 class="mb-0">All Complaints</h5>
-            <span class="badge bg-dark">{{ filtered_complaints|length }}</span>
+        <div class="card-header bg-info text-dark d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3 flex-grow-1" style="max-width: 600px;">
+                <h5 class="mb-0 text-nowrap">All Complaints</h5>
+                
+                <div class="input-group input-group-sm flex-grow-1">
+                    <span class="input-group-text bg-dark border-secondary text-info">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" 
+                           id="helpdeskTableSearch" 
+                           class="form-control bg-dark text-light border-secondary" 
+                           placeholder="Search by ID, title, user, location...">
+                </div>
+            </div>
         </div>
         <div class="card-body">
             {% if filtered_complaints %}
             <div class="table-responsive">
-                <table class="table table-dark table-striped table-hover">
+                <table class="table table-dark table-striped table-hover align-middle" id="helpdeskComplaintsTable">
                     <thead class="table-secondary">
                         <tr>
                             <th>ID</th>
                             <th>Title</th>
                             <th>Category</th>
+                            <th>Description</th>
+                            <th>Raised By</th>
                             <th>Location</th>
-                            <th>Priority</th>
+                            <th>Created</th>
                             <th>Status</th>
                             <th>Resolved By</th>
+                            <th>Reason</th> 
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for c in filtered_complaints %}
+                        {% for c in filtered_complaints|sort(attribute='created_at', reverse=true) %}
                         <tr>
-                            <td><strong>{{ c.complaint_id }}</strong></td>
+                            <td>
+    <a href="{{ url_for('view_single_complaint', id=c.id) }}" target="_blank" class="text-info font-weight-bold text-decoration-none">
+        <i class="fas fa-external-link-alt small me-1"></i> <strong>{{ c.complaint_id }}</strong>
+    </a>
+</td>
                             <td>{{ c.title }}</td>
                             <td><span class="badge bg-secondary">{{ c.category }}</span></td>
-                            <td>{{ c.location }}</td>
                             <td>
-                                {% if c.priority == 'High' %}
-                                <span class="badge bg-danger">High</span>
-                                {% elif c.priority == 'Medium' %}
-                                <span class="badge bg-warning text-dark">Medium</span>
-                                {% else %}
-                                <span class="badge bg-info text-dark">Low</span>
+                                <div style="max-width: 180px; max-height: 75px; overflow-y: auto;" class="small text-muted text-break">
+                                    {{ c.description or '-' }}
+                                </div>
+                            </td>
+                            <td>
+                                {% set creator_found = False %}
+                                {% for u in all_users %}
+                                    {% if u.id|string == c.created_by|string %}
+                                        <span class="badge bg-secondary text-light">
+                                            <i class="fas fa-user-edit"></i> {{ u.name }}
+                                        </span>
+                                        {% set creator_found = True %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not creator_found %}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
+                            <td>{{ c.location }}</td>
+                            <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
                             <td>
                                 {% if c.status == 'Pending' %}
                                 <span class="badge bg-warning text-dark">Pending</span>
@@ -127,34 +150,58 @@
                             </td>
                             <td>
                                 {% if c.resolved_by %}
+                                    {% set matched_updater = none %}
                                     {% for u in all_users %}
-                                        {% if u.id == c.resolved_by %}
-                                        <span class="badge bg-info">{{ u.name }}</span>
+                                        {% if u.id|string|trim == c.resolved_by|string|trim %}
+                                            {% set matched_updater = u %}
                                         {% endif %}
                                     {% endfor %}
+                                    
+                                    {% if matched_updater %}
+                                        <span class="badge bg-info"><i class="fas fa-user-check"></i> {{ matched_updater.name }}</span>
+                                    {% else %}
+                                        <span class="badge bg-info"><i class="fas fa-user-check"></i> {{ current_user.name }}</span>
+                                    {% endif %}
                                 {% else %}
-                                <span class="text-muted">-</span>
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
+                            
+                            <td class="small text-break">
+                                {% if c.resolution_remarks and ':' in c.resolution_remarks %}
+                                    {{ c.resolution_remarks.split(':')[-1]|trim }}
+                                {% else %}
+                                    {{ c.resolution_remarks }}
+                                {% endif %}
+                            </td>
+                            
                             <td>
-                                <!-- ACTION BUTTON - Any complaint not Closed -->
                                 {% if c.status != 'Closed' %}
-                                <form method="POST" action="{{ url_for('helpdesk_update_complaint', comp_id=c.id) }}" class="d-flex gap-1">
-                                    <select name="status" class="form-control form-control-sm bg-dark text-light" style="width: 85px;">
+                                <form method="POST" action="{{ url_for('helpdesk_update_complaint', comp_id=c.id) }}" class="d-flex flex-column gap-1" style="max-width: 140px;">
+                                    <select name="status" class="form-control form-control-sm bg-dark text-light">
                                         <option value="Pending" {% if c.status == 'Pending' %}selected{% endif %}>Pending</option>
                                         <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Active</option>
                                         <option value="Closed" {% if c.status == 'Closed' %}selected{% endif %}>Close</option>
                                     </select>
-                                    <button type="submit" class="btn btn-primary btn-sm" title="Update Status">
-                                        <i class="fas fa-check"></i>
+                                    <textarea
+                                        name="reason"
+                                        class="form-control form-control-sm bg-dark text-light"
+                                        rows="2"
+                                        placeholder="Enter reason..."
+                                        required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-primary w-100">
+                                        Update
                                     </button>
                                 </form>
                                 {% else %}
-                                <span class="badge bg-success">Done</span>
+                                <span class="badge bg-success"><i class="fas fa-check-circle"></i> Done</span>
                                 {% endif %}
                             </td>
                         </tr>
                         {% endfor %}
+                        <tr id="noMatchesRow" style="display: none;">
+                            <td colspan="11" class="text-center text-muted py-4">No matching results found inside dashboard.</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -164,4 +211,33 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const searchInput = document.getElementById('helpdeskTableSearch');
+    const rows = document.querySelectorAll('#helpdeskComplaintsTable tbody tr:not(#noMatchesRow)');
+    const fallbackRow = document.getElementById('noMatchesRow');
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function () {
+            const lookFor = this.value.toLowerCase().trim();
+            let visibleRowsCount = 0;
+
+            rows.forEach(row => {
+                const innerTextContent = row.textContent.toLowerCase();
+                if (innerTextContent.includes(lookFor)) {
+                    row.style.display = '';
+                    visibleRowsCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (fallbackRow) {
+                fallbackRow.style.display = (visibleRowsCount === 0 && lookFor !== '') ? '' : 'none';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

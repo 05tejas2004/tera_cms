@@ -1,7 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-    <!-- Header -->
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2><i class="fas fa-users-cog"></i> User Management</h2>
         <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-light">
@@ -9,7 +8,6 @@
         </a>
     </div>
     
-    <!-- ==================== USER STATS ==================== -->
     <div class="row mb-4">
         <div class="col-12">
             <h4 class="text-info mb-3"><i class="fas fa-chart-pie"></i> User Statistics</h4>
@@ -31,7 +29,7 @@
                 <div class="card-body text-center py-4">
                     <i class="fas fa-desktop fa-2x mb-2"></i>
                     <h1 class="display-4 mb-0">{{ operator_count }}</h1>
-                    <p class="mb-0">Operators</p>
+                    <p class="mb-0">Technical support</p>
                 </div>
             </div>
         </div>
@@ -54,8 +52,48 @@
             </div>
         </div>
     </div>
-    
-    <!-- ==================== PENDING APPROVALS ==================== -->
+
+    <div class="row g-4 mb-4 align-items-stretch">
+        <div class="col-md-6">
+            <div class="card h-100 shadow border-0">
+                <div class="card-header bg-success text-white">
+                    <h5><i class="fas fa-file-download"></i> Export User Data</h5>
+                </div>
+                <div class="card-body d-flex align-items-center">
+                    <a href="{{ url_for('download_users_excel') }}" class="btn btn-success w-100 py-4 shadow-sm">
+                        <i class="fas fa-file-excel fa-2x"></i>
+                        <h4 class="mt-2 mb-1">Download All Users</h4>
+                        <small class="text-light d-block">(Excel with Name, Username, Password, Role)</small>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card h-100 shadow border-0">
+                <div class="card-header bg-primary text-white">
+                    <h5><i class="fas fa-users-cog"></i> Bulk Upload Users</h5>
+                </div>
+                <div class="card-body d-flex flex-column justify-content-between">
+                    <form action="{{ url_for('upload_users') }}" method="POST" enctype="multipart/form-data" class="row g-2">
+                        <div class="col-12 mb-2">
+                            <label for="user_file" class="form-label visually-hidden">Choose Excel or CSV File</label>
+                            <input type="file" class="form-control" id="user_file" name="user_file" accept=".csv, .xlsx, .xls" required>
+                        </div>
+                        <div class="col-12 mb-2">
+                            <button type="submit" class="btn btn-success w-100">
+                                <i class="fas fa-file-upload"></i> Upload & Create Users
+                            </button>
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted d-block text-center">Accepted formats: .csv, .xlsx (Columns: **name**, **username**, **password**, **role**)</small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card mb-4 shadow">
         <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="fas fa-user-clock"></i> Pending Approvals</h5>
@@ -82,7 +120,7 @@
                                 {% if user.role == 'Admin' %}
                                 <span class="badge bg-danger">Admin</span>
                                 {% elif user.role == 'Operator' %}
-                                <span class="badge bg-primary">Operator</span>
+                                <span class="badge bg-primary">Technical Support</span>
                                 {% elif user.role == 'HelpDesk' %}
                                 <span class="badge bg-info text-dark">HelpDesk</span>
                                 {% else %}
@@ -108,7 +146,6 @@
         </div>
     </div>
     
-    <!-- ==================== ALL USERS ==================== -->
     <div class="card shadow">
         <div class="card-header bg-primary d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="fas fa-users"></i> All Users</h5>
@@ -137,7 +174,7 @@
                                 {% if user.role == 'Admin' %}
                                 <span class="badge bg-danger">Admin</span>
                                 {% elif user.role == 'Operator' %}
-                                <span class="badge bg-primary">Operator</span>
+                                <span class="badge bg-primary">Technical Support</span>
                                 {% elif user.role == 'HelpDesk' %}
                                 <span class="badge bg-info text-dark">HelpDesk</span>
                                 {% else %}
@@ -172,17 +209,6 @@
                     </tbody>
                 </table>
             </div>
-        </div>
-    </div>
-    
-    <!-- ==================== DOWNLOAD BUTTON (LAST) ==================== -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <a href="{{ url_for('download_users_excel') }}" class="btn btn-success w-100 py-4 shadow">
-                <i class="fas fa-file-excel fa-2x"></i>
-                <h4 class="mt-2 d-inline">Download All Users</h4>
-                <small class="text-light ms-2">(Excel with Name, Username, Password, Role)</small>
-            </a>
         </div>
     </div>
 </div>

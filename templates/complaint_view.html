@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="fas fa-folder-open text-info"></i> Complaint File Summary</h2>
+        <button onclick="window.close();" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-times"></i> Close Window
+        </button>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow border-secondary bg-dark text-light mb-4">
+                <div class="card-header bg-secondary text-dark fw-bold d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-id-card"></i> Core Log Information</span>
+                    <span class="badge bg-dark text-light">ID: {{ complaint.complaint_id }}</span>
+                </div>
+                <div class="card-body">
+                    <h4 class="text-info mb-3">{{ complaint.title }}</h4>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <p><strong><i class="fas fa-layer-group text-muted"></i> Category:</strong> {{ complaint.category }}</p>
+                            <p><strong><i class="fas fa-map-marker-alt text-muted"></i> Location:</strong> {{ complaint.location }}</p>
+                            <p><strong><i class="fas fa-exclamation-triangle text-muted"></i> Priority Matrix:</strong> 
+                                {% if complaint.priority == 'High' %}
+                                    <span class="badge bg-danger">High</span>
+                                {% elif complaint.priority == 'Medium' %}
+                                    <span class="badge bg-warning text-dark">Medium</span>
+                                {% else %}
+                                    <span class="badge bg-info text-dark">Low</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong><i class="fas fa-info-circle text-muted"></i> Lifecycle Status:</strong> 
+                                {% if complaint.status == 'Pending' %}
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif complaint.status == 'Active' %}
+                                    <span class="badge bg-primary">Active</span>
+                                {% elif complaint.status == 'Closed' %}
+                                    <span class="badge bg-success">Closed</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ complaint.status }}</span>
+                                {% endif %}
+                            </p>
+                            <p><strong><i class="fas fa-calendar-alt text-muted"></i> Created On:</strong> {{ complaint.created_at.strftime('%Y-%m-%d %H:%M:%S') if complaint.created_at else '-' }}</p>
+                            <p><strong><i class="fas fa-clock text-muted"></i> Last Updated:</strong> {{ complaint.assigned_at.strftime('%Y-%m-%d %H:%M:%S') if complaint.assigned_at else '-' }}</p>
+                        </div>
+                    </div>
+
+                    <hr class="border-secondary my-4">
+
+                    <div class="mb-4">
+                        <label class="fw-bold text-info mb-2"><i class="fas fa-align-left"></i> Full Description Profile:</label>
+                        <div class="p-3 rounded border border-secondary text-break bg-dark text-light" style="background-color: #1a1e22 !important; white-space: pre-wrap; min-height: 100px;">{{ complaint.description or 'No description text logs accompanied this registration.' }}</div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="fw-bold text-success mb-2"><i class="fas fa-comment-dots"></i> Latest Resolution Notes / Closing Status Remarks:</label>
+                        <div class="p-3 rounded border border-secondary text-break bg-dark text-light" style="background-color: #1a1e22 !important; white-space: pre-wrap; min-height: 100px;">{{ complaint.resolution_remarks or 'No processing closure notes filed yet.' }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow border-secondary bg-dark text-light mb-4">
+                <div class="card-header bg-dark border-secondary text-info fw-bold">
+                    <i class="fas fa-history"></i> Complete Status Update Lifecycle Logs (Audit Trail)
+                </div>
+                <div class="card-body p-0">
+                    {% if logs %}
+                    <div class="table-responsive">
+                        <table class="table table-dark table-striped table-hover m-0 align-middle">
+                            <thead class="table-secondary">
+                                <tr>
+                                    <th style="width: 5%">#</th>
+                                    <th style="width: 25%">Timestamp</th>
+                                    <th style="width: 20%">Status Changed To</th>
+                                    <th style="width: 20%">Action By</th>
+                                    <th style="width: 30%">Action Reason Provided</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for log in logs %}
+                                <tr>
+                                    <td class="text-muted fw-bold">{{ loop.index }}</td>
+                                    <td><small class="text-info fw-bold">{{ log.changed_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                                    <td>
+                                        {% if log.status == 'Pending' %}
+                                            <span class="badge bg-warning text-dark">Pending</span>
+                                        {% elif log.status == 'Active' %}
+                                            <span class="badge bg-primary">Active</span>
+                                        {% elif log.status == 'Closed' %}
+                                            <span class="badge bg-success">Closed</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ log.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-neutral-700 border border-secondary px-2 py-1 text-light">
+                                            <i class="fas fa-user-cog small text-muted me-1"></i>
+                                            {{ all_users.get(log.changed_by) if log.changed_by and log.changed_by in all_users else 'System Operator' }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="small text-wrap text-muted" style="max-height: 80px; overflow-y: auto;">
+                                            {{ log.reason or '<span class="text-muted italic">No status transition context submitted.</span>'|safe }}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-shoe-prints d-block mb-2" style="font-size: 1.5rem;"></i>
+                        <span>No historical status log changes recorded for this item file.</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card shadow border-secondary bg-dark text-light">
+                <div class="card-header bg-dark border-secondary text-info fw-bold">
+                    <i class="fas fa-user-shield"></i> Audit Signature Records
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <label class="text-muted small d-block mb-1">RAISED / CREATED BY</label>
+                        <div class="d-flex align-items-center gap-2 p-2 rounded" style="background-color: #1a1e22;">
+                            <i class="fas fa-user-edit text-secondary fa-lg p-1"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold">{{ creator.name if creator else 'Unknown User' }}</h6>
+                                <small class="text-muted">{{ creator.role if creator else 'Role Access Unset' }}</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="text-muted small d-block mb-1">RESOLVED / HANDLED BY</label>
+                        <div class="d-flex align-items-center gap-2 p-2 rounded" style="background-color: #1a1e22;">
+                            <i class="fas fa-user-check text-success fa-lg p-1"></i>
+                            <div>
+                                <h6 class="mb-0 fw-bold">{{ resolver.name if resolver else 'Pending Action' }}</h6>
+                                <small class="text-muted">
+                                    {% if resolver %}
+                                        {{ resolver.role }}
+                                    {% else %}
+                                        No agent assignment logged
+                                    {% endif %}
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer bg-transparent border-secondary text-center">
+                    <small class="text-muted">System Security Log Generated</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

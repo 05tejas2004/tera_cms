@@ -1,26 +1,72 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="container mt-4">
-    <h2><i class="fas fa-user-tie"></i> Operator Dashboard</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <h2><i class="fas fa-tools"></i> Technical Support Dashboard</h2>
+    </div>
     
-    <!-- Resolved Complaints - Ready for Verification -->
-    <div class="card mb-4 border-warning">
+    <div class="row g-3 mb-4 text-white">
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-info shadow h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="text-info small uppercase fw-bold mb-1"><i class="fas fa-folder-open"></i> Total Complaints</div>
+                    <h3 class="fw-bold m-0 text-light" id="totalCountBadge">{{ total_count }}</h3>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-danger shadow h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="text-danger small uppercase fw-bold mb-1"><i class="fas fa-spinner"></i> Active / Open</div>
+                    <h3 class="fw-bold m-0 text-light" id="activeCountBadge">{{ active_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-warning shadow h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="text-warning small uppercase fw-bold mb-1"><i class="fas fa-check-circle"></i> Resolved</div>
+                    <h3 class="fw-bold m-0 text-light">{{ resolved_count }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-6 col-md-3">
+            <div class="card bg-dark border-success shadow h-100 text-center">
+                <div class="card-body py-3">
+                    <div class="text-success small uppercase fw-bold mb-1"><i class="fas fa-lock"></i> Verified & Closed</div>
+                    <h3 class="fw-bold m-0 text-light">{{ closed_count }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="mt-4">
+        <a href="{{ url_for('register_complaint') }}" class="btn btn-success py-3">
+            <i class="fas fa-plus"></i> Register New Complaint
+        </a>
+    </div>
+
+    
+    <div class="card mb-4 border-warning shadow mt-4">
         <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="fas fa-check-circle"></i> Resolved Complaints (Ready for Verification)</h5>
             <span class="badge bg-danger">{{ resolved_complaints|length }}</span>
         </div>
+        
         <div class="card-body">
             {% if resolved_complaints %}
             <div class="table-responsive">
-                <table class="table table-dark table-striped">
-                    <thead>
+                <table class="table table-dark table-striped table-hover align-middle">
+                    <thead class="table-secondary">
                         <tr>
                             <th>Complaint ID</th>
                             <th>Title</th>
                             <th>Category</th>
                             <th>Location</th>
                             <th>Resolved By</th>
-                            <th>Resolution Remarks</th>
+                            <th>Reason</th> 
                             <th>Photo</th>
                             <th>Actions</th>
                         </tr>
@@ -34,18 +80,26 @@
                             <td>{{ c.location }}</td>
                             <td>
                                 {% if c.assigned_to %}
-                                {% for u in all_users %}
-                                    {% if u.id == c.assigned_to %}
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-user"></i> {{ u.name }}
-                                        </span>
-                                    {% endif %}
-                                {% endfor %}
+                                    {% for u in all_users %}
+                                        {% if u.id == c.assigned_to %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-user"></i> {{ u.name }}
+                                            </span>
+                                        {% endif %}
+                                    {% endfor %}
                                 {% else %}
-                                <span class="text-muted">-</span>
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
-                            <td>{{ c.resolution_remarks }}</td>
+                            
+                            <td class="small text-break">
+                                {% if c.resolution_remarks and ':' in c.resolution_remarks %}
+                                    {{ c.resolution_remarks.split(':')[-1]|trim }}
+                                {% else %}
+                                    {{ c.resolution_remarks }}
+                                {% endif %}
+                            </td>
+                            
                             <td>
                                 {% if complaint_images[c.id] %}
                                     {% for img in complaint_images[c.id] %}
@@ -64,11 +118,10 @@
                                         </div>
                                     {% endfor %}
                                 {% else %}
-                                <span class="text-muted">No photo</span>
+                                    <span class="text-muted">No photo</span>
                                 {% endif %}
                             </td>
                             <td>
-                                <!-- UPDATED: Link to verify page -->
                                 <a href="{{ url_for('verify_complaint', comp_id=c.id) }}" class="btn btn-warning btn-sm">
                                     <i class="fas fa-eye"></i> View & Verify
                                 </a>
@@ -87,45 +140,103 @@
         </div>
     </div>
     
-    <!-- All Complaints Table -->
-    <div class="card">
-        <div class="card-header bg-info text-dark d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="fas fa-list"></i> All Complaints</h5>
-            <a href="{{ url_for('register_complaint') }}" class="btn btn-success btn-sm">
-                <i class="fas fa-plus"></i> New Complaint
-            </a>
+    
+    <div class="card shadow">
+        <div class="card-header bg-info text-dark d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div class="d-flex align-items-center gap-3 flex-grow-1" style="max-width: 600px;">
+                <h5 class="mb-0 text-nowrap"><i class="fas fa-list"></i> All Complaints</h5>
+                
+                <div class="input-group input-group-sm flex-grow-1">
+                    <span class="input-group-text bg-dark border-secondary text-info">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" 
+                           id="allComplaintsSearch" 
+                           class="form-control bg-dark text-light border-secondary" 
+                           placeholder="Search layout fields...">
+                </div>
+            </div>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-dark table-striped">
-                    <thead>
+                <table class="table table-dark table-striped table-hover align-middle" id="allComplaintsTable">
+                    <thead class="table-secondary">
                         <tr>
                             <th>ID</th>
                             <th>Title</th>
+                            <th>Description</th>
+                            <th>Raised By</th>
                             <th>Category</th>
                             <th>Location</th>
-                            <th>Priority</th>
-                            <th>Status</th>
                             <th>Resolved By</th>
+                            <th>Reason</th> 
                             <th>Created</th>
+                            <th>Current Status</th> 
+                            <th>Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="allComplaintsTbody">
                         {% for c in complaints %}
                         <tr>
-                            <td><strong>{{ c.complaint_id }}</strong></td>
-                            <td>{{ c.title }}</td>
-                            <td>{{ c.category }}</td>
-                            <td>{{ c.location }}</td>
                             <td>
-                                {% if c.priority == 'High' %}
-                                <span class="badge bg-danger">High</span>
-                                {% elif c.priority == 'Medium' %}
-                                <span class="badge bg-warning text-dark">Medium</span>
-                                {% else %}
-                                <span class="badge bg-info text-dark">Low</span>
+    <a href="{{ url_for('view_single_complaint', id=c.id) }}" target="_blank" class="text-info font-weight-bold text-decoration-none">
+        <i class="fas fa-external-link-alt small me-1"></i> <strong>{{ c.complaint_id }}</strong>
+    </a>
+</td>
+                            <td>{{ c.title }}</td>
+                            
+                            <td>
+                                <div style="max-width: 180px; max-height: 75px; overflow-y: auto;" class="small text-muted text-break">
+                                    {{ c.description or '-' }}
+                                </div>
+                            </td>
+                            <td>
+                                {% set creator_found = False %}
+                                {% for u in all_users %}
+                                    {% if u.id == c.created_by %}
+                                        <span class="badge bg-secondary text-light">
+                                            <i class="fas fa-user-edit"></i> {{ u.name }}
+                                        </span>
+                                        {% set creator_found = True %}
+                                    {% endif %}
+                                {% endfor %}
+                                {% if not creator_found %}
+                                    <span class="text-muted">-</span>
                                 {% endif %}
                             </td>
+                            
+                            <td>{{ c.category }}</td>
+                            <td>{{ c.location }}</td>
+                            
+                            <td>
+                                {% if c.assigned_to %}
+                                    {% for u in all_users %}
+                                        {% if u.id == c.assigned_to %}
+                                            {% if c.status == 'Resolved' or c.status == 'Closed' %}
+                                            <span class="badge bg-success">
+                                                <i class="fas fa-user-check"></i> {{ u.name }}
+                                            </span>
+                                            {% else %}
+                                            <span class="badge bg-primary">
+                                                <i class="fas fa-user"></i> {{ u.name }}
+                                            </span>
+                                            {% endif %}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            
+                            <td class="small text-break">
+                                {% if c.resolution_remarks and ':' in c.resolution_remarks %}
+                                    {{ c.resolution_remarks.split(':')[-1]|trim }}
+                                {% else %}
+                                    {{ c.resolution_remarks or '-' }}
+                                {% endif %}
+                            </td>
+                            
+                            <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
                             <td>
                                 {% if c.status == 'Pending' %}
                                 <span class="badge bg-warning text-dark">Pending</span>
@@ -140,31 +251,142 @@
                                 {% endif %}
                             </td>
                             <td>
-                                {% if c.assigned_to %}
-                                {% for u in all_users %}
-                                    {% if u.id == c.assigned_to %}
-                                        {% if c.status == 'Resolved' or c.status == 'Closed' %}
-                                        <span class="badge bg-success">
-                                            <i class="fas fa-user-check"></i> {{ u.name }}
-                                        </span>
-                                        {% else %}
-                                        <span class="badge bg-primary">
-                                            <i class="fas fa-user"></i> {{ u.name }}
-                                        </span>
-                                        {% endif %}
-                                    {% endif %}
-                                {% endfor %}
-                                {% else %}
-                                <span class="text-muted">-</span>
-                                {% endif %}
+                                <form method="POST" action="{{ url_for('tech_support_update_complaint', comp_id=c.id) }}" class="d-flex flex-column gap-1" style="max-width: 150px;">
+                                    <select name="status" class="form-control form-control-sm bg-dark text-light">
+                                        <option value="Resolved" {% if c.status == 'Resolved' %}selected{% endif %}>Resolved</option>
+                                        <option value="Active" {% if c.status == 'Active' %}selected{% endif %}>Reopen (Active)</option>
+                                        <option value="Closed" {% if c.status == 'Closed' %}selected{% endif %}>Verify & Close</option>
+                                    </select>
+                                    <textarea
+                                        name="reason"
+                                        class="form-control form-control-sm bg-dark text-light"
+                                        rows="2"
+                                        placeholder="Reason for change..."
+                                        required></textarea>
+                                    <button type="submit" class="btn btn-sm btn-warning w-100">
+                                        Update Status
+                                    </button>
+                                </form>
                             </td>
-                            <td>{{ c.created_at.strftime('%Y-%m-%d %H:%M') if c.created_at else '-' }}</td>
                         </tr>
                         {% endfor %}
+                        <tr id="emptySearchRow" style="display: none;">
+                            <td colspan="12" class="text-center text-muted py-4">No match found inside historical complaints.</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
         </div>
     </div>
 </div>
+
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Establish live communication with app.py backend
+    const socket = io.connect(window.location.origin, {
+        transports: ['websocket', 'polling']
+    });
+
+    socket.on('connect', () => {
+        console.log("--> WebSocket: Successfully connected to Dashboard stream!");
+    });
+
+    // 2. Catch the Global Socket event fired by register_complaint
+    socket.on('global_notification', function(data) {
+        console.log("Real-time notification incoming: ", data);
+        
+        // Native Pop-Up Message Alert
+        alert(data.title + "\n\n" + data.message);
+        
+        // (Optional) Browser Audio Notification sound ring
+        try {
+            let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = "sine";
+            osc.frequency.value = 523.25; // C5 note sound ring
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        } catch (e) { console.log("Audio block bypass: ", e); }
+    });
+
+    // 3. Catch the structured data event to prepend a live row on the dashboard instantly
+    socket.on('new_complaint', function(data) {
+        const tbody = document.getElementById('allComplaintsTbody');
+        if (!tbody) return;
+
+        // Dynamic badge logic based on priority value mapping
+        let priorityBadge = `<span class="badge bg-info text-dark">Low</span>`;
+        if (data.priority === 'High') priorityBadge = `<span class="badge bg-danger">High</span>`;
+        else if (data.priority === 'Medium') priorityBadge = `<span class="badge bg-warning text-dark">Medium</span>`;
+
+        // Generate matching structure row string mapping directly into your HTML architecture
+        const liveRowHtml = `
+            <tr style="background-color: rgba(25, 135, 84, 0.25) !important; transition: background 2s ease;">
+                <td><strong>${data.complaint_id}</strong></td>
+                <td>${data.title}</td>
+                <td>
+                    <div style="max-width: 180px; max-height: 75px; overflow-y: auto;" class="small text-muted text-break">
+                        ${data.description || '-'}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge bg-secondary text-light">
+                        <i class="fas fa-user-edit"></i> ${data.creator_name || 'HelpDesk'}
+                    </span>
+                </td>
+                <td>${data.category}</td>
+                <td>${data.location}</td>
+                <td>${priorityBadge}</td>
+                <td><span class="text-muted">-</span></td>
+                <td class="small text-break">-</td>
+                <td>${data.created_at || 'Just Now'}</td>
+                <td><span class="badge bg-warning text-dark">Pending</span></td>
+                <td>
+                    <div class="text-muted small">Refresh to manage</div>
+                </td>
+            </tr>
+        `;
+        
+        // Prepend straight into table instantly
+        tbody.insertAdjacentHTML('afterbegin', liveRowHtml);
+
+        // Update dashboard numeric counter fields instantly 
+        const totalBadge = document.getElementById('totalCountBadge');
+        const activeBadge = document.getElementById('activeCountBadge');
+        if (totalBadge) totalBadge.innerText = parseInt(totalBadge.innerText || 0) + 1;
+        if (activeBadge) activeBadge.innerText = parseInt(activeBadge.innerText || 0) + 1;
+    });
+
+    // 4. Existing client-side layout filters (Live search functionality)
+    const searchField = document.getElementById('allComplaintsSearch');
+    const tableRows = document.querySelectorAll('#allComplaintsTable tbody tr:not(#emptySearchRow)');
+    const emptyRowFallback = document.getElementById('emptySearchRow');
+
+    if (searchField) {
+        searchField.addEventListener('input', function () {
+            const value = this.value.toLowerCase().trim();
+            let recordsFound = 0;
+
+            tableRows.forEach(row => {
+                const rawText = row.textContent.toLowerCase();
+                if (rawText.includes(value)) {
+                    row.style.display = '';
+                    recordsFound++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            if (emptyRowFallback) {
+                emptyRowFallback.style.display = (recordsFound === 0 && value !== '') ? '' : 'none';
+            }
+        });
+    }
+});
+</script>
 {% endblock %}
